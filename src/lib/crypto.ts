@@ -320,19 +320,36 @@ export function downloadBlob(blob: Blob, filename: string): void {
   if (typeof window === "undefined") return;
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.style.display = "none";
+  a.style.position = "fixed";
+  a.style.top = "0";
+  a.style.left = "0";
+  a.style.width = "1px";
+  a.style.height = "1px";
+  a.style.opacity = "0.01";
   a.href = url;
   a.download = filename;
   a.rel = "noopener noreferrer";
   document.body.appendChild(a);
-  a.click();
+
+  // Dispatch real mouse click event for cross-browser reliability
+  try {
+    const evt = new MouseEvent("click", {
+      view: window,
+      bubbles: true,
+      cancelable: true,
+    });
+    a.dispatchEvent(evt);
+  } catch {
+    a.click();
+  }
+
   // Clean up after download triggers
   setTimeout(() => {
     if (document.body.contains(a)) {
       document.body.removeChild(a);
     }
     window.URL.revokeObjectURL(url);
-  }, 5000);
+  }, 10000);
 }
 
 /** Format bytes to a human-readable string */

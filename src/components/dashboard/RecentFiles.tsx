@@ -44,6 +44,7 @@ export function RecentFiles() {
   // Decryption state (FR-5)
   const [decryptingCid, setDecryptingCid] = useState<string | null>(null);
   const [decryptProgress, setDecryptProgress] = useState<string>("");
+  const [readyDownload, setReadyDownload] = useState<{ name: string; url: string } | null>(null);
 
   // Share modal state (FR-6)
   const [sharingFile, setSharingFile] = useState<StoredEncryptedFile | null>(null);
@@ -105,21 +106,22 @@ export function RecentFiles() {
       await signMessageAsync({ message: challenge });
 
       setDecryptProgress("Signature verified. Fetching ciphertext from IPFS...");
-      await downloadAndDecryptFromIpfs(
+      const decrypted = await downloadAndDecryptFromIpfs(
         file.cid,
         file.keyHex,
         undefined,
         (msg) => setDecryptProgress(msg)
       );
 
-      setActiveNotification(`Decrypted & downloaded: ${file.fileName}`);
+      const url = window.URL.createObjectURL(decrypted.plainBlob);
+      setReadyDownload({ name: decrypted.originalName, url });
+      setActiveNotification(`Decrypted: ${file.fileName}`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Decryption failed.";
       setActiveNotification(`Decryption error: ${msg}`);
     } finally {
       setDecryptingCid(null);
       setDecryptProgress("");
-      setTimeout(() => setActiveNotification(null), 5000);
     }
   };
 
@@ -155,13 +157,15 @@ export function RecentFiles() {
       );
 
       setDecryptProgress("Fetching ciphertext from IPFS...");
-      await downloadAndDecryptFromIpfs(
+      const decrypted = await downloadAndDecryptFromIpfs(
         share.cid,
         unwrappedKeyHex,
         undefined,
         (msg) => setDecryptProgress(msg)
       );
 
+      const url = window.URL.createObjectURL(decrypted.plainBlob);
+      setReadyDownload({ name: decrypted.originalName, url });
       setActiveNotification(`Decrypted peer file: ${share.fileName}`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Shared file decryption failed.";
@@ -169,7 +173,6 @@ export function RecentFiles() {
     } finally {
       setDecryptingCid(null);
       setDecryptProgress("");
-      setTimeout(() => setActiveNotification(null), 5000);
     }
   };
 
@@ -317,8 +320,35 @@ export function RecentFiles() {
         </div>
       )}
 
+      {/* Ready Download Direct Link */}
+      {readyDownload && (
+        <div className="bg-emerald-950/40 border-b border-emerald-500/40 px-5 py-3 flex items-center justify-between gap-4 text-xs font-mono text-emerald-300 animate-in fade-in duration-200">
+          <div className="flex items-center gap-2">
+            <Check className="h-4 w-4 text-emerald-400 shrink-0" />
+            <span>Decrypted file ready: <strong className="text-white font-semibold">{readyDownload.name}</strong></span>
+          </div>
+          <div className="flex items-center gap-2">
+            <a
+              href={readyDownload.url}
+              download={readyDownload.name}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-semibold text-xs transition-colors shrink-0 shadow-sm"
+            >
+              <Download className="h-3.5 w-3.5" />
+              <span>Download File Now</span>
+            </a>
+            <button
+              type="button"
+              onClick={() => setReadyDownload(null)}
+              className="text-zinc-500 hover:text-zinc-300"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Toast Notification */}
-      {activeNotification && !decryptingCid && (
+      {activeNotification && !decryptingCid && !readyDownload && (
         <div className="bg-cyan-950/30 border-b border-cyan-500/30 px-5 py-2.5 flex items-center gap-2 text-xs font-mono text-cyan-300 animate-in fade-in duration-200">
           <Info className="h-4 w-4 shrink-0 text-cyan-400" />
           <span>{activeNotification}</span>
