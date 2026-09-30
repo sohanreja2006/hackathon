@@ -1,65 +1,55 @@
 import React from "react";
-import { Wallet, Lock, Database, Share2 } from "lucide-react";
+import { Wallet, Lock, Database, Share2, CheckCircle2 } from "lucide-react";
 
 export function HowItWorks() {
   const steps = [
     {
       number: "01",
-      title: "Connect MetaMask",
+      title: "Connect Wallet",
       description:
-        "Authenticate using your MetaMask EVM wallet. Your public address acts as your sovereign decentralized identity without centralized passwords or credential leaks.",
+        "Authenticate using your Web3 wallet. Your public address acts as your decentralized identity. SecureVault never asks for private keys or recovery phrases.",
       icon: Wallet,
       tag: "Sovereign Identity",
-      accent: "text-[#F6851B]",
-      borderHover: "hover:border-[#F6851B]/60",
     },
     {
       number: "02",
       title: "Encrypt Locally",
       description:
-        "Your files are encrypted in-memory directly on your local device using high-performance AES-GCM-256 before any byte touches the network. Plaintext never leaves your machine.",
+        "Your files are encrypted in-memory directly on your device using AES-256-GCM before any byte touches the network. Plaintext never leaves your machine.",
       icon: Lock,
-      tag: "Client Cryptography",
-      accent: "text-[#037DD6]",
-      borderHover: "hover:border-[#037DD6]/60",
+      tag: "Client-Side Cryptography",
     },
     {
       number: "03",
-      title: "Pin to IPFS",
+      title: "Store on IPFS",
       description:
-        "The encrypted ciphertext is distributed across immutable peer-to-peer storage networks (IPFS via Pinata). Files are content-addressed and immune to single-server outages.",
+        "The encrypted ciphertext chunks are stored across decentralized IPFS storage. Content-addressed hashes ensure integrity and zero single-server dependencies.",
       icon: Database,
-      tag: "Distributed Storage",
-      accent: "text-emerald-400",
-      borderHover: "hover:border-emerald-500/60",
+      tag: "Decentralized IPFS",
     },
     {
       number: "04",
       title: "Share Securely",
       description:
-        "Grant granular read permissions to recipient wallet addresses using asymmetric public-key cryptography. Inspect active access grants at any moment.",
+        "Grant granular read permissions to recipient wallet addresses using cryptographic key envelopes. Plaintext remains strictly private and client-side.",
       icon: Share2,
-      tag: "Access Matrix",
-      accent: "text-[#F6851B]",
-      borderHover: "hover:border-[#F6851B]/60",
+      tag: "Zero-Knowledge Sharing",
     },
   ];
 
   return (
-    <section id="how-it-works" className="py-20 md:py-28 border-t border-[#2E3238] bg-[#141618] relative">
+    <section id="how-it-works" className="py-20 md:py-24 border-t border-slate-200/80 bg-slate-50/50 relative">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto space-y-3 mb-16">
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#3B4046] bg-[#1E2024] px-3.5 py-1 text-xs font-mono text-[#F6851B] shadow-sm">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#F6851B] animate-pulse" />
-            CRYPTOGRAPHIC WORKFLOW
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3.5 py-1 text-xs font-semibold text-[#2563EB]">
+            <span>CRYPTOGRAPHIC WORKFLOW</span>
           </div>
-          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-[#F2F4F6]">
-            How VaultX Works
+          <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900">
+            How SecureVault Works
           </h2>
-          <p className="text-[#848C96] text-sm sm:text-base leading-relaxed">
-            A frictionless zero-trust pipeline designed from the ground up to protect your most
-            critical intellectual property, documents, and sensitive files.
+          <p className="text-slate-600 text-sm sm:text-base leading-relaxed">
+            A transparent zero-knowledge pipeline designed to protect your most critical files, documents, and sensitive data.
           </p>
         </div>
 
@@ -70,30 +60,36 @@ export function HowItWorks() {
             return (
               <div
                 key={step.number}
-                className={`relative rounded-2xl border border-[#3B4046] bg-[#1E2024] p-6 backdrop-blur-md transition-all duration-200 hover:-translate-y-1 hover:bg-[#24272A] shadow-md shadow-black/20 ${step.borderHover}`}
+                className="relative rounded-2xl border border-slate-200/90 bg-white p-6 shadow-2xs hover:shadow-md hover:border-blue-200 transition-all duration-200 hover:-translate-y-0.5"
               >
-                {/* Step Index Watermark */}
+                {/* Step Index & Icon */}
                 <div className="flex items-center justify-between mb-4">
-                  <div className="p-2.5 rounded-xl bg-[#24272A] border border-[#3B4046] shadow-inner">
-                    <Icon className={`h-5 w-5 ${step.accent}`} />
+                  <div className="p-2.5 rounded-xl bg-blue-50 text-[#2563EB]">
+                    <Icon className="h-5 w-5" />
                   </div>
-                  <span className="font-mono text-2xl font-bold text-[#3B4046]">
+                  <span className="font-mono text-2xl font-bold text-slate-300">
                     {step.number}
                   </span>
                 </div>
 
-                <div className="space-y-2">
-                  <span className="text-[11px] font-mono uppercase tracking-wider text-[#848C96] font-semibold">
+                <div className="space-y-1.5">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-[#2563EB]">
                     {step.tag}
                   </span>
-                  <h3 className="text-lg font-semibold text-[#F2F4F6]">{step.title}</h3>
-                  <p className="text-xs text-[#848C96] leading-relaxed">
+                  <h3 className="text-base font-bold text-slate-900">{step.title}</h3>
+                  <p className="text-xs text-slate-500 leading-relaxed pt-0.5">
                     {step.description}
                   </p>
                 </div>
               </div>
             );
           })}
+        </div>
+
+        {/* Reassurance Callout */}
+        <div className="mt-10 max-w-xl mx-auto text-center flex items-center justify-center gap-2 text-xs text-emerald-700 bg-emerald-50/80 border border-emerald-200 rounded-full py-2 px-4 font-medium">
+          <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+          <span>Factual Security: Plaintext never leaves your machine. Only encrypted data reaches storage.</span>
         </div>
       </div>
     </section>

@@ -1,12 +1,12 @@
 "use client";
 
 /**
- * CYBER-10 Phase 3 — FileEncryptionPanel
+ * SecureVault — FileEncryptionPanel
  *
  * A rich, dual-mode (Encrypt / Decrypt) file encryption UI that uses the
  * client-side AES-256-GCM engine from src/lib/crypto.ts.
  *
- * All cryptographic operations happen locally — no data leaves the browser.
+ * All cryptographic operations happen locally in browser WebCrypto — no plaintext leaves your device.
  */
 
 import React, { useState, useCallback, useRef } from "react";
@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { encryptFile, decryptFile, downloadBlob, formatBytes, type EncryptedFileBundle, type CryptoProgress } from "@/lib/crypto";
 import { cn } from "@/lib/utils";
+import { OwlCompanion } from "@/components/ui/OwlCompanion";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -55,7 +56,6 @@ function CopyButton({ text, className }: { text: string; className?: string }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Fallback for older browsers
       const el = document.createElement("textarea");
       el.value = text;
       document.body.appendChild(el);
@@ -72,15 +72,15 @@ function CopyButton({ text, className }: { text: string; className?: string }) {
       type="button"
       onClick={handleCopy}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-mono transition-all duration-200",
+        "inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all duration-200",
         copied
-          ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
-          : "bg-zinc-800 text-zinc-400 border border-zinc-700 hover:bg-zinc-700 hover:text-zinc-200",
+          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+          : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 hover:text-slate-900 shadow-2xs",
         className
       )}
       title="Copy to clipboard"
     >
-      {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+      {copied ? <Check className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3" />}
       {copied ? "Copied!" : "Copy"}
     </button>
   );
@@ -124,24 +124,23 @@ function DropZone({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (f) onFileSelect(f);
-    // Reset input so same file can be re-selected
     e.target.value = "";
   };
 
   if (file) {
     return (
-      <div className="relative flex items-center gap-3 rounded-xl border border-[#3B4046] bg-[#141618] p-4">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#F6851B]/15 border border-[#F6851B]/30">
-          <FileText className="h-5 w-5 text-[#F6851B]" />
+      <div className="relative flex items-center gap-3.5 rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 border border-blue-100 text-[#2563EB]">
+          <FileText className="h-5 w-5" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-[#F2F4F6]">{file.name}</p>
-          <p className="text-xs text-[#848C96]">{formatBytes(file.size)} · {file.type || "binary payload"}</p>
+          <p className="truncate text-sm font-bold text-slate-900">{file.name}</p>
+          <p className="text-xs text-slate-500 font-mono mt-0.5">{formatBytes(file.size)} · {file.type || "binary payload"}</p>
         </div>
         <button
           type="button"
           onClick={onClear}
-          className="shrink-0 rounded-lg p-1.5 text-[#848C96] hover:bg-[#24272A] hover:text-[#F2F4F6] transition-colors"
+          className="shrink-0 rounded-xl p-1.5 text-slate-400 hover:bg-slate-200/80 hover:text-slate-700 transition-colors"
           title="Remove file"
         >
           <X className="h-4 w-4" />
@@ -159,8 +158,8 @@ function DropZone({
       className={cn(
         "relative flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed p-8 text-center cursor-pointer transition-all duration-200",
         isDragging
-          ? "border-[#F6851B] bg-[#F6851B]/10 scale-[1.01]"
-          : "border-[#3B4046] hover:border-[#F6851B]/60 hover:bg-[#24272A]/50 bg-[#141618]/60"
+          ? "border-[#2563EB] bg-blue-50/60 scale-[1.01]"
+          : "border-slate-300 hover:border-[#2563EB]/70 hover:bg-blue-50/30 bg-slate-50/50"
       )}
     >
       <input
@@ -173,13 +172,13 @@ function DropZone({
       />
       <div className={cn(
         "flex h-12 w-12 items-center justify-center rounded-2xl border transition-all duration-200",
-        isDragging ? "border-[#F6851B]/60 bg-[#F6851B]/20" : "border-[#3B4046] bg-[#24272A]"
+        isDragging ? "border-blue-200 bg-blue-100 text-[#2563EB]" : "border-slate-200 bg-white text-slate-500 shadow-2xs"
       )}>
-        <Upload className={cn("h-5 w-5 transition-colors", isDragging ? "text-[#F6851B]" : "text-[#848C96]")} />
+        <Upload className="h-5 w-5" />
       </div>
       <div>
-        <p className="text-sm font-semibold text-[#F2F4F6]">{label}</p>
-        <p className="mt-0.5 text-xs text-[#848C96]">{sublabel}</p>
+        <p className="text-sm font-bold text-slate-900">{label}</p>
+        <p className="mt-0.5 text-xs text-slate-500">{sublabel}</p>
       </div>
     </div>
   );
@@ -193,11 +192,11 @@ function KeyDisplay({ keyHex }: { keyHex: string }) {
     : keyHex.slice(0, 8) + "•".repeat(48) + keyHex.slice(-8);
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2.5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
-          <Key className="h-3.5 w-3.5 text-[#F6851B]" />
-          <span className="text-xs font-bold text-[#F6851B] uppercase tracking-wider">
+          <Key className="h-3.5 w-3.5 text-[#2563EB]" />
+          <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
             AES-256 Encryption Key
           </span>
         </div>
@@ -205,24 +204,24 @@ function KeyDisplay({ keyHex }: { keyHex: string }) {
           <button
             type="button"
             onClick={() => setVisible((v) => !v)}
-            className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-mono text-[#848C96] hover:text-[#F2F4F6] hover:bg-[#24272A] transition-colors"
+            className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
           >
             {visible ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
             {visible ? "Hide" : "Show"}
           </button>
-          <CopyButton text={keyHex} className="bg-[#141618] border-[#3B4046] text-[#848C96] hover:text-white" />
+          <CopyButton text={keyHex} />
         </div>
       </div>
 
-      <div className="rounded-xl border border-[#3B4046] bg-[#141618] p-3">
-        <p className="break-all font-mono text-xs text-[#F6851B] leading-relaxed">
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+        <p className="break-all font-mono text-xs text-slate-800 leading-relaxed">
           {display}
         </p>
       </div>
 
-      <div className="flex items-start gap-2 rounded-xl border border-red-500/30 bg-red-950/20 px-3.5 py-2.5">
-        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-400" />
-        <p className="text-[11px] text-red-300 leading-relaxed">
+      <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/80 px-3.5 py-2.5">
+        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
+        <p className="text-[11px] text-amber-900 leading-relaxed">
           <strong>Save this key now.</strong> It is not stored anywhere on the server. Without this key, the encrypted file cannot be decrypted.
         </p>
       </div>
@@ -234,14 +233,14 @@ function ProgressBar({ stage, message }: { stage: string; message: string }) {
   const isIndeterminate = stage !== "done" && stage !== "error";
   return (
     <div className="space-y-2">
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#141618]">
+      <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
         {isIndeterminate ? (
-          <div className="h-full w-1/3 rounded-full bg-[#F6851B] animate-[shimmer_1.2s_ease-in-out_infinite]" />
+          <div className="h-full w-1/3 rounded-full bg-[#2563EB] animate-[shimmer_1.2s_ease-in-out_infinite]" />
         ) : (
           <div className={cn("h-full w-full rounded-full transition-all", stage === "done" ? "bg-emerald-500" : "bg-red-500")} />
         )}
       </div>
-      <p className="text-xs text-[#848C96] font-mono">{message}</p>
+      <p className="text-xs text-slate-600 font-mono">{message}</p>
     </div>
   );
 }
@@ -281,18 +280,54 @@ function EncryptPanel() {
   return (
     <div className="space-y-5">
       {/* Info Banner */}
-      <div className="flex items-start gap-2.5 rounded-xl border border-[#037DD6]/30 bg-[#141618] px-4 py-3">
-        <Info className="mt-0.5 h-4 w-4 shrink-0 text-[#037DD6]" />
-        <div className="text-xs text-[#848C96] leading-relaxed">
-          <span className="text-[#037DD6] font-semibold">Zero-knowledge sovereign encryption.</span>{" "}
+      <div className="flex items-start gap-2.5 rounded-xl border border-blue-200 bg-blue-50/70 px-4 py-3">
+        <Info className="mt-0.5 h-4 w-4 shrink-0 text-[#2563EB]" />
+        <div className="text-xs text-slate-700 leading-relaxed">
+          <span className="text-[#2563EB] font-bold">Encrypted locally.</span>{" "}
           Your file is read into local browser memory and encrypted with AES-256-GCM.
-          No data is uploaded to any server. The cryptographic key is generated on your device.
+          No plaintext data is uploaded to any server. The cryptographic key is generated on your device.
+        </div>
+      </div>
+
+      {/* Owl Companion Assistant Card */}
+      <div className="rounded-2xl border border-slate-200/90 bg-slate-50/50 p-4 flex items-center gap-4">
+        <OwlCompanion
+          state={
+            opState.status === "processing"
+              ? "encrypting"
+              : opState.status === "success"
+              ? "success"
+              : file
+              ? "file_selected"
+              : "idle"
+          }
+          size="sm"
+        />
+        <div className="min-w-0 flex-1">
+          <div className="text-xs font-bold text-slate-900">
+            {opState.status === "processing"
+              ? "Protecting File Locally"
+              : opState.status === "success"
+              ? "File Secured with AES-256"
+              : file
+              ? "File Loaded & Ready"
+              : "Guardian Ready"}
+          </div>
+          <p className="text-[11px] text-slate-500 mt-0.5">
+            {opState.status === "processing"
+              ? "Encrypting locally in your browser memory before any network interaction."
+              : opState.status === "success"
+              ? "Your encrypted bundle is prepared with a 256-bit symmetric key."
+              : file
+              ? "Click 'Secure File' to run client-side authenticated encryption."
+              : "Drop your file below. Plaintext never leaves your computer."}
+          </p>
         </div>
       </div>
 
       {/* File Drop Zone */}
       <div>
-        <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-[#848C96]">
+        <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">
           1. Select File to Encrypt
         </label>
         <DropZone
@@ -314,8 +349,8 @@ function EncryptPanel() {
           className={cn(
             "w-full flex items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold transition-all duration-200",
             opState.status === "processing"
-              ? "bg-[#24272A] text-[#848C96] cursor-not-allowed border border-[#3B4046]"
-              : "bg-[#F6851B] hover:bg-[#E2761B] text-white shadow-md active:scale-[0.98]"
+              ? "bg-slate-200 text-slate-500 cursor-not-allowed"
+              : "bg-[#2563EB] hover:bg-[#1D4ED8] text-white shadow-xs active:scale-[0.99]"
           )}
         >
           {opState.status === "processing" ? (
@@ -323,7 +358,7 @@ function EncryptPanel() {
           ) : (
             <Lock className="h-4 w-4" />
           )}
-          {opState.status === "processing" ? "Encrypting with AES-256…" : "Encrypt File"}
+          {opState.status === "processing" ? "Encrypting with AES-256…" : "Secure File (Encrypt Locally)"}
         </button>
       )}
 
@@ -334,19 +369,19 @@ function EncryptPanel() {
 
       {/* Error */}
       {opState.status === "error" && opState.errorMessage && (
-        <div className="flex items-start gap-2 rounded-xl border border-red-500/30 bg-red-950/20 px-4 py-3">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
-          <p className="text-sm text-red-300">{opState.errorMessage}</p>
+        <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+          <p className="text-sm text-red-700">{opState.errorMessage}</p>
         </div>
       )}
 
       {/* Success Result */}
       {opState.status === "success" && bundle && (
-        <div className="space-y-4 rounded-2xl border border-[#3B4046] bg-[#24272A] p-5 shadow-lg">
+        <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           {/* Header */}
           <div className="flex items-center gap-2">
-            <ShieldCheck className="h-5 w-5 text-emerald-400" />
-            <span className="font-bold text-white">File Encrypted Successfully</span>
+            <ShieldCheck className="h-5 w-5 text-emerald-600" />
+            <span className="font-bold text-slate-900">File Encrypted Successfully</span>
           </div>
 
           {/* Metadata */}
@@ -357,9 +392,9 @@ function EncryptPanel() {
               { label: "Original Size", value: formatBytes(bundle.originalSizeBytes) },
               { label: "Encrypted Size", value: formatBytes(bundle.encryptedSizeBytes) },
             ].map(({ label, value }) => (
-              <div key={label} className="rounded-xl border border-[#3B4046] bg-[#141618] px-3.5 py-2.5">
-                <p className="text-[10px] uppercase tracking-wider text-[#848C96]">{label}</p>
-                <p className="mt-0.5 font-mono text-sm text-[#F2F4F6] font-semibold">{value}</p>
+              <div key={label} className="rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5">
+                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{label}</p>
+                <p className="mt-0.5 font-mono text-xs text-slate-900 font-bold">{value}</p>
               </div>
             ))}
           </div>
@@ -373,14 +408,14 @@ function EncryptPanel() {
               type="button"
               onClick={() => downloadBlob(bundle.encryptedBlob, bundle.downloadName)}
               id="download-encrypted-btn"
-              className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-[#3B4046] bg-[#141618] py-2.5 text-xs font-semibold text-[#F2F4F6] hover:bg-[#2B2F34] transition-all"
+              className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-2.5 text-xs font-bold text-slate-800 hover:bg-slate-50 shadow-2xs transition-all"
             >
-              <Download className="h-4 w-4 text-[#F6851B]" />
+              <Download className="h-4 w-4 text-[#2563EB]" />
               Download Encrypted File
             </button>
             <a
               href="/dashboard/vault"
-              className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-[#F6851B] hover:bg-[#E2761B] py-2.5 text-xs font-bold text-white shadow-sm transition-all"
+              className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] py-2.5 text-xs font-bold text-white shadow-xs transition-all"
             >
               <Upload className="h-4 w-4" />
               Upload to IPFS Vault →
@@ -388,7 +423,7 @@ function EncryptPanel() {
             <button
               type="button"
               onClick={reset}
-              className="flex items-center justify-center gap-2 rounded-xl border border-[#3B4046] bg-[#141618] px-4 py-2.5 text-xs font-medium text-[#848C96] hover:bg-[#2B2F34] hover:text-[#F2F4F6] transition-colors"
+              className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
             >
               <RefreshCw className="h-3.5 w-3.5" />
               Reset
@@ -441,18 +476,48 @@ function DecryptPanel() {
   return (
     <div className="space-y-5">
       {/* Info Banner */}
-      <div className="flex items-start gap-2.5 rounded-xl border border-[#037DD6]/30 bg-[#141618] px-4 py-3">
-        <Info className="mt-0.5 h-4 w-4 shrink-0 text-[#037DD6]" />
-        <div className="text-xs text-[#848C96] leading-relaxed">
-          <span className="text-[#037DD6] font-semibold">Authenticated decryption.</span>{" "}
+      <div className="flex items-start gap-2.5 rounded-xl border border-blue-200 bg-blue-50/70 px-4 py-3">
+        <Info className="mt-0.5 h-4 w-4 shrink-0 text-[#2563EB]" />
+        <div className="text-xs text-slate-700 leading-relaxed">
+          <span className="text-[#2563EB] font-bold">Authenticated decryption.</span>{" "}
           The GCM auth tag is verified before any data is returned — if the file has been tampered
           with or the key is incorrect, client-side decryption will fail.
         </div>
       </div>
 
+      {/* Owl Decryption Companion Card */}
+      <div className="rounded-2xl border border-slate-200/90 bg-slate-50/50 p-4 flex items-center gap-4">
+        <OwlCompanion
+          state={
+            opState.status === "processing"
+              ? "decrypting"
+              : opState.status === "success"
+              ? "success"
+              : "idle"
+          }
+          size="sm"
+        />
+        <div className="min-w-0 flex-1">
+          <div className="text-xs font-bold text-slate-900">
+            {opState.status === "processing"
+              ? "Verifying Integrity & Decrypting"
+              : opState.status === "success"
+              ? "File Ready"
+              : "Local Decryption Guardian"}
+          </div>
+          <p className="text-[11px] text-slate-500 mt-0.5">
+            {opState.status === "processing"
+              ? "Validating 128-bit authentication tag and decrypting ciphertext locally."
+              : opState.status === "success"
+              ? "Original file reconstructed and downloaded to your computer."
+              : "Provide your .cyber10enc file and 64-character hex key below."}
+          </p>
+        </div>
+      </div>
+
       {/* File Drop */}
       <div>
-        <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-[#848C96]">
+        <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">
           1. Select Encrypted File (.cyber10enc)
         </label>
         <DropZone
@@ -468,12 +533,12 @@ function DecryptPanel() {
       {/* Key Input */}
       <div>
         <div className="mb-2 flex items-center justify-between">
-          <label className="text-xs font-semibold uppercase tracking-wider text-[#848C96]">
+          <label className="text-xs font-bold uppercase tracking-wider text-slate-600">
             2. Paste Your AES-256 Key
           </label>
           <span className={cn(
             "text-[11px] font-mono",
-            keyInput.length === 64 ? "text-emerald-400" : keyInput.length > 0 ? "text-[#F6851B]" : "text-[#848C96]"
+            keyInput.length === 64 ? "text-emerald-600 font-bold" : keyInput.length > 0 ? "text-blue-600" : "text-slate-400"
           )}>
             {keyInput.length}/64 hex chars
           </span>
@@ -488,18 +553,18 @@ function DecryptPanel() {
             autoComplete="off"
             id="decrypt-key-input"
             className={cn(
-              "w-full rounded-xl border bg-[#141618] px-4 py-3 pr-12 font-mono text-xs text-[#F2F4F6] placeholder:text-[#848C96] focus:outline-none transition-colors",
+              "w-full rounded-xl border bg-white px-4 py-3 pr-12 font-mono text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none transition-colors",
               keyInput.length === 64
-                ? "border-emerald-500/60 focus:border-emerald-400"
+                ? "border-emerald-500 focus:border-emerald-600"
                 : keyInput.length > 0
-                ? "border-[#F6851B]/60 focus:border-[#F6851B]"
-                : "border-[#3B4046] focus:border-[#F6851B]"
+                ? "border-blue-400 focus:border-[#2563EB]"
+                : "border-slate-200 focus:border-[#2563EB]"
             )}
           />
           <button
             type="button"
             onClick={() => setShowKey((v) => !v)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-[#848C96] hover:text-[#F2F4F6] transition-colors"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 transition-colors"
           >
             {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
@@ -508,11 +573,11 @@ function DecryptPanel() {
 
       {/* File required helper text */}
       {!file && keyInput.trim().length === 64 && (
-        <div className="flex items-center justify-between rounded-xl border border-[#F6851B]/30 bg-[#F6851B]/10 px-3.5 py-2.5 text-xs text-[#F6851B]">
+        <div className="flex items-center justify-between rounded-xl border border-blue-200 bg-blue-50 px-3.5 py-2.5 text-xs text-blue-900">
           <span>⚠️ <strong>Step 1 required:</strong> Click or drop your <code>.cyber10enc</code> file into box #1 above.</span>
           <a
             href="/dashboard/vault"
-            className="ml-3 shrink-0 underline text-white hover:text-[#F6851B] font-semibold"
+            className="ml-3 shrink-0 underline text-[#2563EB] hover:text-[#1D4ED8] font-bold"
           >
             Or decrypt from IPFS Vault →
           </a>
@@ -529,8 +594,8 @@ function DecryptPanel() {
           className={cn(
             "w-full flex items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold transition-all duration-200",
             !canDecrypt || opState.status === "processing"
-              ? "bg-[#24272A] text-[#848C96] cursor-not-allowed border border-[#3B4046]"
-              : "bg-[#F6851B] hover:bg-[#E2761B] text-white shadow-md active:scale-[0.98]"
+              ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+              : "bg-[#2563EB] hover:bg-[#1D4ED8] text-white shadow-xs active:scale-[0.99]"
           )}
         >
           {opState.status === "processing" ? (
@@ -539,7 +604,7 @@ function DecryptPanel() {
             <Unlock className="h-4 w-4" />
           )}
           {opState.status === "processing"
-            ? "Decrypting Payload…"
+            ? "Decrypting Payload Locally…"
             : !file
             ? "Select a .cyber10enc file to decrypt"
             : keyInput.trim().length !== 64
@@ -556,11 +621,11 @@ function DecryptPanel() {
       {/* Error */}
       {opState.status === "error" && opState.errorMessage && (
         <div className="space-y-2">
-          <div className="flex items-start gap-2 rounded-xl border border-red-500/30 bg-red-950/20 px-4 py-3">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
-            <p className="text-sm text-red-300">{opState.errorMessage}</p>
+          <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+            <p className="text-sm text-red-700">{opState.errorMessage}</p>
           </div>
-          <button type="button" onClick={reset} className="text-xs text-[#848C96] hover:text-[#F2F4F6] underline transition-colors">
+          <button type="button" onClick={reset} className="text-xs text-slate-500 hover:text-slate-800 underline transition-colors">
             Try again
           </button>
         </div>
@@ -568,16 +633,16 @@ function DecryptPanel() {
 
       {/* Success */}
       {opState.status === "success" && result && (
-        <div className="space-y-4 rounded-2xl border border-[#3B4046] bg-[#24272A] p-5 shadow-lg">
+        <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center gap-2">
-            <ShieldCheck className="h-5 w-5 text-emerald-400" />
-            <span className="font-bold text-white">Integrity Verified — File Decrypted</span>
+            <ShieldCheck className="h-5 w-5 text-emerald-600" />
+            <span className="font-bold text-slate-900">Integrity Verified — File Decrypted</span>
           </div>
-          <div className="flex items-center gap-3 rounded-xl border border-[#3B4046] bg-[#141618] px-3.5 py-2.5">
-            <FileText className="h-5 w-5 shrink-0 text-[#F6851B]" />
+          <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5">
+            <FileText className="h-5 w-5 shrink-0 text-[#2563EB]" />
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-[#F2F4F6]">{result.name}</p>
-              <p className="text-xs text-[#848C96]">{formatBytes(result.blob.size)}</p>
+              <p className="truncate text-sm font-bold text-slate-900">{result.name}</p>
+              <p className="text-xs text-slate-500 font-mono mt-0.5">{formatBytes(result.blob.size)}</p>
             </div>
           </div>
           <div className="flex flex-col sm:flex-row gap-2.5">
@@ -585,7 +650,7 @@ function DecryptPanel() {
               type="button"
               onClick={() => downloadBlob(result.blob, result.name)}
               id="download-decrypted-btn"
-              className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-[#F6851B] hover:bg-[#E2761B] py-2.5 text-xs font-bold text-white shadow-sm transition-all"
+              className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] py-2.5 text-xs font-bold text-white shadow-xs transition-all"
             >
               <Download className="h-4 w-4" />
               Download Original File
@@ -593,7 +658,7 @@ function DecryptPanel() {
             <button
               type="button"
               onClick={reset}
-              className="flex items-center justify-center gap-2 rounded-xl border border-[#3B4046] bg-[#141618] px-4 py-2.5 text-xs font-medium text-[#848C96] hover:bg-[#2B2F34] hover:text-[#F2F4F6] transition-colors"
+              className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
             >
               <RefreshCw className="h-3.5 w-3.5" />
               Decrypt Another
@@ -606,7 +671,7 @@ function DecryptPanel() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Main exported component (MetaMask Aesthetic)
+// Main exported component (SecureVault Clean Aesthetic)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function FileEncryptionPanel() {
@@ -615,7 +680,7 @@ export function FileEncryptionPanel() {
   return (
     <div className="panel-max-w w-full max-w-2xl mx-auto">
       {/* Mode Toggle */}
-      <div className="mb-6 flex rounded-2xl border border-[#3B4046] bg-[#141618] p-1.5 shadow-md">
+      <div className="mb-6 flex rounded-2xl border border-slate-200 bg-slate-100 p-1.5 shadow-2xs">
         {(["encrypt", "decrypt"] as Mode[]).map((m) => (
           <button
             key={m}
@@ -625,18 +690,18 @@ export function FileEncryptionPanel() {
             className={cn(
               "flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold transition-all duration-200",
               mode === m
-                ? "bg-[#24272A] text-white border border-[#3B4046] shadow-sm"
-                : "text-[#848C96] hover:text-[#F2F4F6]"
+                ? "bg-white text-slate-900 border border-slate-200/90 shadow-xs"
+                : "text-slate-500 hover:text-slate-800"
             )}
           >
-            {m === "encrypt" ? <Lock className="h-4 w-4 text-[#F6851B]" /> : <Unlock className="h-4 w-4 text-[#037DD6]" />}
+            {m === "encrypt" ? <Lock className="h-4 w-4 text-[#2563EB]" /> : <Unlock className="h-4 w-4 text-[#2563EB]" />}
             {m === "encrypt" ? "Encrypt File" : "Decrypt File"}
           </button>
         ))}
       </div>
 
       {/* Panel Content — both panels always mounted to preserve state on tab switch */}
-      <div className="rounded-2xl border border-[#3B4046] bg-[#1E2024] shadow-2xl p-6 sm:p-8">
+      <div className="rounded-2xl border border-slate-200/90 bg-white shadow-xs p-6 sm:p-8">
         <div className={mode === "encrypt" ? "block" : "hidden"}>
           <EncryptPanel />
         </div>

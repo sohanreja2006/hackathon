@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { WagmiProvider } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { RainbowKitProvider, midnightTheme } from "@rainbow-me/rainbowkit";
+import { RainbowKitProvider, lightTheme } from "@rainbow-me/rainbowkit";
 import { wagmiConfig } from "@/lib/wagmi";
 import { AuthProvider } from "@/context/AuthContext";
 import { VaultXWalletProvider } from "@/context/VaultXWalletContext";
@@ -32,8 +32,8 @@ export function Web3Provider({ children }: Web3ProviderProps) {
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider
           modalSize="compact"
-          theme={midnightTheme({
-            accentColor: "#F6851B",           // MetaMask Fox Orange
+          theme={lightTheme({
+            accentColor: "#2563EB",           // SecureVault Royal Blue
             accentColorForeground: "#ffffff", // Pure White
             borderRadius: "large",
             fontStack: "system",

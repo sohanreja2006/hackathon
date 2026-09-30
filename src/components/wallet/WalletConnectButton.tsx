@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { ChevronDown, Wallet, Lock, Plus } from "lucide-react";
+import { ChevronDown, Lock } from "lucide-react";
 import { cn, formatAddress } from "@/lib/utils";
 import { useVaultXWallet } from "@/context/VaultXWalletContext";
 import { ConnectWalletModal } from "./ConnectWalletModal";
@@ -13,12 +13,6 @@ interface WalletConnectButtonProps {
   showNetworkBadge?: boolean;
 }
 
-/**
- * WalletConnectButton (Enhanced with VaultX Secure Wallet)
- * 
- * Preserves 100% of existing MetaMask functionality via RainbowKit,
- * and adds seamless dual-identity support for VaultX Secure Wallet.
- */
 export function WalletConnectButton({
   className,
   size = "default",
@@ -45,14 +39,14 @@ export function WalletConnectButton({
           return (
             <div
               className={cn(
-                "h-10 w-36 animate-pulse rounded-lg bg-zinc-800/60 border border-zinc-700/50",
+                "h-10 w-36 animate-pulse rounded-full bg-slate-100 border border-slate-200",
                 className
               )}
             />
           );
         }
 
-        // Neither wallet is connected -> Show Main "Connect Wallet" button which opens choice modal
+        // Neither wallet connected -> Show Main "Connect Wallet" button
         if (!anyConnected) {
           return (
             <>
@@ -60,16 +54,15 @@ export function WalletConnectButton({
                 onClick={() => setModalOpen(true)}
                 type="button"
                 className={cn(
-                  "group relative inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition-all duration-200",
-                  "bg-[#f6851b] hover:bg-[#e2761b] active:bg-[#cd6116] text-[#141618]",
-                  "shadow-md shadow-[#f6851b]/20 border border-[#f6851b]/40",
-                  size === "sm" && "h-8 px-3 text-xs",
-                  size === "default" && "h-10 px-4 text-sm",
-                  size === "lg" && "h-12 px-6 text-base tracking-wide",
+                  "group relative inline-flex items-center justify-center gap-2 rounded-full font-semibold transition-all duration-200",
+                  "bg-[#2563EB] hover:bg-[#1D4ED8] active:bg-[#1E40AF] text-white",
+                  "shadow-sm shadow-blue-500/20",
+                  size === "sm" && "h-8 px-4 text-xs",
+                  size === "default" && "h-10 px-5 text-sm",
+                  size === "lg" && "h-12 px-7 text-base tracking-wide",
                   className
                 )}
               >
-                <span className="text-base leading-none">🦊</span>
                 <span>Connect Wallet</span>
               </button>
 
@@ -82,14 +75,14 @@ export function WalletConnectButton({
           );
         }
 
-        // Handle wrong network for MetaMask
+        // Handle wrong network
         if (chain?.unsupported) {
           return (
             <button
               onClick={openChainModal}
               type="button"
               className={cn(
-                "inline-flex items-center gap-2 rounded-lg bg-rose-500/10 border border-rose-500/40 px-3.5 py-2 text-xs font-semibold text-rose-300 hover:bg-rose-500/20 transition-all",
+                "inline-flex items-center gap-2 rounded-full bg-rose-50 border border-rose-200 px-3.5 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-100 transition-all",
                 className
               )}
             >
@@ -102,18 +95,18 @@ export function WalletConnectButton({
           );
         }
 
-        // Connected state: MetaMask takes priority when connected; VaultX displayed when active without MetaMask
+        // Connected state
         return (
           <>
             <div className={cn("inline-flex items-center gap-2 flex-wrap", className)}>
               {metaMaskConnected && account ? (
                 <>
-                  {/* Chain Selector Pill (MetaMask) */}
+                  {/* Chain Selector Pill */}
                   {showNetworkBadge && chain && (
                     <button
                       onClick={openChainModal}
                       type="button"
-                      className="hidden sm:inline-flex items-center gap-1.5 rounded-xl border border-[#3b4046] bg-[#1e2024] px-3 py-1.5 text-xs font-medium text-[#f2f4f6] hover:bg-[#2b2f34] hover:border-[#f6851b]/50 transition-colors"
+                      className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-purple-200 bg-purple-50 px-3 py-1.5 text-xs font-medium text-purple-700 hover:bg-purple-100 transition-colors"
                       title={`Switch Network: Currently on ${chain.name}`}
                     >
                       {chain.hasIcon && chain.iconUrl && (
@@ -125,80 +118,69 @@ export function WalletConnectButton({
                         />
                       )}
                       <span className="max-w-[100px] truncate">{chain.name}</span>
-                      <ChevronDown className="h-3 w-3 text-[#848c96]" />
+                      <ChevronDown className="h-3 w-3 text-purple-500" />
                     </button>
                   )}
 
-                  {/* 🦊 MetaMask Address Pill */}
+                  {/* Address Pill */}
                   <button
                     onClick={openAccountModal}
                     type="button"
                     className={cn(
-                      "inline-flex items-center gap-2 rounded-xl border border-[#3b4046] bg-[#1e2024] text-[#f2f4f6]",
-                      "hover:border-[#f6851b]/60 hover:bg-[#2b2f34] transition-all active:scale-[0.98]",
-                      size === "sm" && "h-8 px-2.5 text-xs",
-                      size === "default" && "h-10 px-3.5 text-sm",
-                      size === "lg" && "h-12 px-4 text-base"
+                      "inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white text-slate-800 shadow-2xs",
+                      "hover:border-blue-300 hover:bg-slate-50 transition-all active:scale-[0.98]",
+                      size === "sm" && "h-8 px-3 text-xs",
+                      size === "default" && "h-10 px-4 text-sm",
+                      size === "lg" && "h-12 px-5 text-base"
                     )}
                   >
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                    </span>
-
-                    <span className="font-mono font-medium tracking-tight text-[#f6851b] flex items-center gap-1">
-                      <span>🦊</span>
-                      <span>{account.displayName || formatAddress(account.address)}</span>
+                    <span className="text-base">🦊</span>
+                    <span className="font-mono font-semibold tracking-tight text-slate-900">
+                      {account.displayName || formatAddress(account.address)}
                     </span>
 
                     {account.displayBalance && (
-                      <span className="hidden md:inline text-xs text-[#848c96] border-l border-[#3b4046] pl-2 font-mono">
+                      <span className="hidden md:inline text-xs text-slate-500 border-l border-slate-200 pl-2 font-mono">
                         {account.displayBalance}
                       </span>
                     )}
 
-                    <ChevronDown className="h-3.5 w-3.5 text-[#848c96]" />
+                    <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
                   </button>
                 </>
               ) : isVaultXConnected && identity ? (
-                /* 🔐 VaultX Secure Wallet Pill (Only when MetaMask is NOT connected) */
+                /* Secure Key Wallet Pill */
                 <button
                   onClick={() => setModalOpen(true)}
                   type="button"
                   className={cn(
-                    "inline-flex items-center gap-2 rounded-xl border border-[#3b4046] bg-[#1e2024] text-[#f2f4f6]",
-                    "hover:border-[#f6851b]/60 hover:bg-[#2b2f34] transition-all active:scale-[0.98]",
-                    size === "sm" && "h-8 px-2.5 text-xs",
-                    size === "default" && "h-10 px-3.5 text-sm",
-                    size === "lg" && "h-12 px-4 text-base"
+                    "inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 text-blue-800 shadow-2xs",
+                    "hover:bg-blue-100 transition-all active:scale-[0.98]",
+                    size === "sm" && "h-8 px-3 text-xs",
+                    size === "default" && "h-10 px-4 text-sm",
+                    size === "lg" && "h-12 px-5 text-base"
                   )}
-                  title="VaultX Secure Wallet Identity (Protects File Encryption Keys)"
                 >
-                  <span className="text-[#f6851b]">
-                    <Lock className="h-3.5 w-3.5" />
-                  </span>
-                  <span className="font-mono font-medium tracking-tight text-[#f6851b]">
+                  <Lock className="h-3.5 w-3.5 text-blue-600" />
+                  <span className="font-mono font-semibold tracking-tight text-blue-900">
                     {identity.id}
                   </span>
-                  <span className="hidden sm:inline-flex items-center rounded-full bg-[#f6851b]/15 border border-[#f6851b]/30 px-1.5 py-0.5 text-[9px] text-[#f6851b] font-semibold">
+                  <span className="hidden sm:inline-flex items-center rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-[10px] font-semibold">
                     Protected
                   </span>
                 </button>
               ) : (
-                /* Neither connected */
                 <button
                   onClick={() => setModalOpen(true)}
                   type="button"
                   className={cn(
-                    "group relative inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition-all duration-200",
-                    "bg-[#f6851b] hover:bg-[#e2761b] active:bg-[#cd6116] text-[#141618]",
-                    "shadow-md shadow-[#f6851b]/20 border border-[#f6851b]/40",
-                    size === "sm" && "h-8 px-3 text-xs",
-                    size === "default" && "h-10 px-4 text-sm",
-                    size === "lg" && "h-12 px-6 text-base tracking-wide"
+                    "group relative inline-flex items-center justify-center gap-2 rounded-full font-semibold transition-all duration-200",
+                    "bg-[#2563EB] hover:bg-[#1D4ED8] active:bg-[#1E40AF] text-white shadow-sm",
+                    size === "sm" && "h-8 px-4 text-xs",
+                    size === "default" && "h-10 px-5 text-sm",
+                    size === "lg" && "h-12 px-7 text-base"
                   )}
                 >
-                  <span className="text-base leading-none">🦊</span>
                   <span>Connect Wallet</span>
                 </button>
               )}

@@ -16,9 +16,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "VaultX | MetaMask Sovereign Decentralized Secure File Storage",
+  title: "SecureVault | Private files. Encrypted before they leave your device.",
   description:
-    "Zero-knowledge decentralized file storage and sharing platform where users maintain complete control of their data.",
+    "SecureVault encrypts your files on your device before storing encrypted data through decentralized IPFS infrastructure.",
   icons: {
     icon: "/favicon.ico",
   },
@@ -33,9 +33,9 @@ export default function RootLayout({
     <html
       lang="en"
       data-scroll-behavior="smooth"
-      className={`${geistSans.variable} ${geistMono.variable} dark h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-[#141618] text-[#f2f4f6] selection:bg-[#f6851b] selection:text-[#141618]">
+      <body className="min-h-full flex flex-col bg-[#F8FAFC] text-[#0F172A] selection:bg-[#2563EB] selection:text-white">
         <Web3Provider>
           <Navbar />
           <main className="flex-1 flex flex-col">{children}</main>

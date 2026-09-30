@@ -1,15 +1,14 @@
 @import "tailwindcss";
 
 :root {
-  --background: #141618;
-  --foreground: #f2f4f6;
-  --mm-orange: #f6851b;
-  --mm-orange-hover: #e2761b;
-  --mm-blue: #037dd6;
-  --mm-blue-hover: #038ff0;
-  --mm-surface: #1e2024;
-  --mm-card: #24272a;
-  --mm-border: #3b4046;
+  --background: #F8FAFC;
+  --foreground: #0F172A;
+  --sv-blue: #2563EB;
+  --sv-blue-hover: #1D4ED8;
+  --sv-blue-light: #EFF6FF;
+  --sv-surface: #FFFFFF;
+  --sv-border: #E2E8F0;
+  --sv-card: #FFFFFF;
 }
 
 @theme inline {
@@ -20,39 +19,40 @@
 }
 
 html {
-  color-scheme: dark;
+  color-scheme: light;
   scroll-behavior: smooth;
 }
 
 body {
-  background-color: #141618;
-  color: #f2f4f6;
+  background-color: #F8FAFC;
+  color: #0F172A;
   overflow-x: hidden;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }
 
-/* MetaMask Fox Orange Text Selection */
+/* SecureVault Electric Blue Text Selection */
 ::selection {
-  background-color: #f6851b;
-  color: #141618;
+  background-color: #2563EB;
+  color: #FFFFFF;
 }
 
-/* MetaMask Subtle Charcoal Scrollbar */
+/* Crisp Clean Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #141618;
+  background: #F1F5F9;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #2b2f34;
+  background: #CBD5E1;
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #3b4046;
+  background: #94A3B8;
 }
 
 /* Shimmer animation for indeterminate progress bars */
@@ -65,9 +65,44 @@ body {
   }
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   RESPONSIVE UTILITIES — Media Query Overrides
-   ───────────────────────────────────────────────────────────────────────────── */
+/* Owl Guardian Gentle Living Animations */
+@keyframes owl-breathe {
+  0%, 100% {
+    transform: translateY(0px) scale(1);
+  }
+  50% {
+    transform: translateY(-4px) scale(1.015);
+  }
+}
+
+@keyframes owl-shield-pulse {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(0.98);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.04);
+  }
+}
+
+@keyframes owl-success-glow {
+  0%, 100% {
+    filter: drop-shadow(0 4px 12px rgba(16, 185, 129, 0.25));
+  }
+  50% {
+    filter: drop-shadow(0 8px 24px rgba(16, 185, 129, 0.5));
+  }
+}
+
+@keyframes owl-float-slow {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
 
 /* Ensure full-width page container never overflows */
 * {
@@ -75,11 +110,12 @@ body {
   min-width: 0;
 }
 
-/* ── MOBILE (≤ 480px) ────────────────────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────────────────
+   RESPONSIVE UTILITIES
+   ───────────────────────────────────────────────────────────────────────────── */
 @media (max-width: 480px) {
-  /* Modals: full-screen on very small devices */
   .modal-sheet {
-    border-radius: 1rem 1rem 0 0 !important;
+    border-radius: 1.25rem 1.25rem 0 0 !important;
     max-height: 92dvh;
     overflow-y: auto;
     position: fixed !important;
@@ -92,81 +128,21 @@ body {
     max-width: 100% !important;
   }
 
-  /* Hero headline size */
   h1 {
     font-size: clamp(1.75rem, 8vw, 2.5rem) !important;
     line-height: 1.2 !important;
   }
 
-  /* Dashboard header: stack action buttons vertically */
-  .dashboard-header-actions {
-    flex-direction: column !important;
-    align-items: stretch !important;
-    gap: 0.5rem !important;
-  }
-
-  /* Table: convert to card-list on mobile */
-  .file-table-mobile-card thead {
-    display: none;
-  }
-  .file-table-mobile-card tbody tr {
-    display: flex;
-    flex-direction: column;
-    border: 1px solid rgba(63, 63, 70, 0.5);
-    border-radius: 0.75rem;
-    margin: 0.5rem 1rem;
-    padding: 0.75rem;
-    gap: 0.5rem;
-    background: rgba(24, 24, 27, 0.6);
-  }
-  .file-table-mobile-card tbody td {
-    padding: 0 !important;
-    display: block;
-    border: none !important;
-  }
-  .file-table-mobile-card tbody td::before {
-    content: attr(data-label);
-    display: block;
-    font-size: 0.6rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: #52525b;
-    margin-bottom: 0.15rem;
-    font-family: monospace;
-  }
-
-  /* Vault tab buttons: compress on small screens */
-  .vault-tab-label {
-    display: none;
-  }
-  .vault-tab-icon {
-    display: block !important;
-  }
-
-  /* Stat cards: 2-column grid */
   .stat-cards-grid {
     grid-template-columns: repeat(2, 1fr) !important;
   }
 }
 
-/* ── SMALL (≤ 640px / sm breakpoint) ────────────────────────────────────── */
 @media (max-width: 640px) {
-  /* Prevent fixed-width elements from overflowing */
-  .min-w-\[240px\] {
-    min-width: 0 !important;
-  }
-
-  /* Table: allow horizontal scroll with visible scrollbar hint */
   .overflow-x-auto {
     -webkit-overflow-scrolling: touch;
   }
 
-  /* ConnectWalletModal: full width on mobile */
-  .wallet-modal-inner {
-    padding: 1.25rem !important;
-  }
-
-  /* Recent files tab controls: wrap cleanly */
   .files-header-row {
     flex-direction: column !important;
     align-items: flex-start !important;
@@ -174,107 +150,5 @@ body {
   .files-search-wrap {
     width: 100% !important;
     max-width: 100% !important;
-  }
-
-  /* Navbar brand: hide subtitle on very small */
-  .navbar-subtitle {
-    display: none;
-  }
-
-  /* Security status pills: allow wrap */
-  .security-pills {
-    flex-wrap: wrap;
-    gap: 0.4rem;
-  }
-
-  /* Page action banners: stack vertically */
-  .action-banner {
-    flex-direction: column !important;
-    gap: 0.75rem !important;
-  }
-  .action-banner-btn {
-    width: 100% !important;
-    justify-content: center !important;
-  }
-}
-
-/* ── MEDIUM (≤ 768px / md breakpoint) ───────────────────────────────────── */
-@media (max-width: 768px) {
-  /* Dashboard header identity card: full-width */
-  .identity-card {
-    width: 100% !important;
-  }
-
-  /* FileEncryptionPanel / VaultPanel: remove horizontal margin */
-  .panel-max-w {
-    max-width: 100% !important;
-  }
-
-  /* Crypto spec bar: 2-column wrap */
-  .crypto-spec-bar {
-    flex-wrap: wrap;
-    gap: 0.5rem 1rem;
-  }
-
-  /* Security feature grid: 1-col on tablets */
-  .security-grid {
-    grid-template-columns: 1fr 1fr !important;
-  }
-
-  /* How-it-works steps: stack vertically */
-  .how-it-works-step {
-    flex-direction: column !important;
-    text-align: center !important;
-  }
-
-  /* Hero: center the visual card */
-  .hero-visual {
-    max-width: 28rem;
-    margin-left: auto;
-    margin-right: auto;
-  }
-}
-
-/* ── TABLET / LANDSCAPE PHONE (641px–1024px) ─────────────────────────────── */
-@media (min-width: 641px) and (max-width: 1024px) {
-  /* Nav pill: reduce padding */
-  .nav-pill-link {
-    padding-left: 0.5rem !important;
-    padding-right: 0.5rem !important;
-    font-size: 0.7rem !important;
-  }
-
-  /* Dashboard stats grid: 2-col */
-  .stats-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
-  }
-}
-
-/* ── PREVENT TEXT OVERFLOW GLOBALLY ─────────────────────────────────────── */
-.truncate-safe {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
-}
-
-/* ── MODAL RESPONSIVE SIZING ─────────────────────────────────────────────── */
-@media (max-width: 520px) {
-  .responsive-modal {
-    padding: 1rem !important;
-    border-radius: 1rem !important;
-    margin: 0.75rem !important;
-    width: calc(100% - 1.5rem) !important;
-    max-width: 100% !important;
-  }
-}
-
-/* ── SAFE AREA PADDING (notched phones) ─────────────────────────────────── */
-@supports (padding: env(safe-area-inset-bottom)) {
-  .pb-safe {
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-  .pt-safe {
-    padding-top: env(safe-area-inset-top);
   }
 }

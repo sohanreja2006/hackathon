@@ -5,10 +5,11 @@ import { cn } from "@/lib/utils";
 interface StatCardProps {
   title: string;
   value: string | number;
-  subtitle: string;
+  subtitle?: string;
   icon: LucideIcon;
   badge?: string;
   badgeVariant?: "success" | "cyber" | "warning" | "default";
+  iconColor?: string;
   className?: string;
 }
 
@@ -19,48 +20,41 @@ export function StatCard({
   icon: Icon,
   badge,
   badgeVariant = "default",
+  iconColor = "text-[#2563EB]",
   className,
 }: StatCardProps) {
   return (
     <div
       className={cn(
-        "relative rounded-2xl border border-[#3b4046] bg-[#1e2024] p-5 backdrop-blur-md transition-all duration-200 hover:border-[#f6851b]/50 hover:bg-[#24272a] shadow-md shadow-black/20",
+        "rounded-2xl border border-slate-200/90 bg-white p-5 shadow-2xs hover:shadow-sm hover:border-blue-200 transition-all duration-200",
         className
       )}
     >
       <div className="flex items-center justify-between mb-3">
-        <span className="text-xs font-mono uppercase tracking-wider text-[#848c96] font-semibold">
-          {title}
-        </span>
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#3b4046] bg-[#24272a] text-[#f6851b] shadow-inner">
-          <Icon className="h-4 w-4" />
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50/80">
+          <Icon className={cn("h-5 w-5", iconColor)} />
         </div>
+        {badge && (
+          <span
+            className={cn(
+              "rounded-full px-2.5 py-0.5 text-[11px] font-medium border",
+              badgeVariant === "success" && "bg-emerald-50 text-emerald-700 border-emerald-200",
+              badgeVariant === "cyber" && "bg-blue-50 text-[#2563EB] border-blue-200",
+              badgeVariant === "warning" && "bg-amber-50 text-amber-700 border-amber-200",
+              badgeVariant === "default" && "bg-slate-100 text-slate-600 border-slate-200"
+            )}
+          >
+            {badge}
+          </span>
+        )}
       </div>
 
-      <div className="space-y-1">
-        <div className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#f2f4f6] font-mono">
+      <div className="space-y-0.5">
+        <div className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
           {value}
         </div>
-        <div className="flex items-center justify-between gap-2 pt-1">
-          <p className="text-xs text-[#848c96]">{subtitle}</p>
-          {badge && (
-            <span
-              className={cn(
-                "rounded-full px-2.5 py-0.5 text-[10px] font-mono font-semibold border",
-                badgeVariant === "success" &&
-                  "bg-emerald-950/60 text-emerald-400 border-emerald-500/30",
-                badgeVariant === "cyber" &&
-                  "bg-[#f6851b]/15 text-[#f6851b] border-[#f6851b]/35",
-                badgeVariant === "warning" &&
-                  "bg-amber-950/60 text-amber-400 border-amber-500/30",
-                badgeVariant === "default" &&
-                  "bg-[#24272a] text-[#848c96] border-[#3b4046]"
-              )}
-            >
-              {badge}
-            </span>
-          )}
-        </div>
+        <p className="text-xs font-medium text-slate-500">{title}</p>
+        {subtitle && <p className="text-[11px] text-slate-400 pt-0.5">{subtitle}</p>}
       </div>
     </div>
   );

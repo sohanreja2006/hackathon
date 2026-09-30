@@ -14,7 +14,7 @@ export function VaultTabs() {
   return (
     <div className="panel-max-w w-full max-w-2xl mx-auto">
       {/* Tab switcher */}
-      <div className="mb-6 flex rounded-2xl border border-[#3B4046] bg-[#141618] p-1.5 shadow-md">
+      <div className="mb-6 flex rounded-2xl border border-slate-200 bg-slate-100/80 p-1.5 shadow-2xs">
         {(["upload", "retrieve"] as Tab[]).map((tab) => (
           <button
             key={tab}
@@ -24,22 +24,22 @@ export function VaultTabs() {
             className={cn(
               "flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold transition-all duration-200",
               activeTab === tab
-                ? "bg-[#24272A] text-white border border-[#3B4046] shadow-sm"
-                : "text-[#848C96] hover:text-[#F2F4F6]"
+                ? "bg-white text-slate-900 border border-slate-200/80 shadow-xs"
+                : "text-slate-500 hover:text-slate-900"
             )}
           >
             {tab === "upload" ? (
-              <Upload className="h-4 w-4 text-[#F6851B]" />
+              <Upload className="h-4 w-4 text-[#2563EB]" />
             ) : (
-              <Download className="h-4 w-4 text-[#037DD6]" />
+              <Download className="h-4 w-4 text-[#2563EB]" />
             )}
             {tab === "upload" ? "Encrypt & Upload" : "Retrieve & Decrypt"}
           </button>
         ))}
       </div>
 
-      {/* Panel content — always mounted to preserve state on tab switch */}
-      <div className="rounded-2xl border border-[#3B4046] bg-[#1E2024] shadow-2xl p-6 sm:p-8">
+      {/* Panel content */}
+      <div className="rounded-3xl border border-slate-200/90 bg-white shadow-sm p-6 sm:p-8">
         <div className={activeTab === "upload" ? "block" : "hidden"}>
           <VaultUploadPanel />
         </div>
