@@ -36,7 +36,7 @@ export default function RootLayout({
       data-scroll-behavior="smooth"
       className={`${geistSans.variable} ${geistMono.variable} dark h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-zinc-950 text-zinc-100 selection:bg-cyan-500 selection:text-zinc-950">
+      <body className="min-h-full flex flex-col bg-[#141618] text-[#f2f4f6] selection:bg-[#f6851b] selection:text-[#141618]">
         <NextAuthProvider>
           <Web3Provider>
             <Navbar />

@@ -14,7 +14,7 @@ export function VaultTabs() {
   return (
     <div className="panel-max-w w-full max-w-2xl mx-auto">
       {/* Tab switcher */}
-      <div className="mb-6 flex rounded-xl border border-zinc-800 bg-zinc-900 p-1">
+      <div className="mb-6 flex rounded-2xl border border-[#3B4046] bg-[#141618] p-1.5 shadow-md">
         {(["upload", "retrieve"] as Tab[]).map((tab) => (
           <button
             key={tab}
@@ -22,18 +22,16 @@ export function VaultTabs() {
             id={`vault-tab-${tab}`}
             onClick={() => setActiveTab(tab)}
             className={cn(
-              "flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold transition-all duration-200",
+              "flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold transition-all duration-200",
               activeTab === tab
-                ? tab === "upload"
-                  ? "bg-gradient-to-r from-cyan-500/20 to-violet-500/20 text-cyan-300 border border-cyan-500/30"
-                  : "bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 text-violet-300 border border-violet-500/30"
-                : "text-zinc-500 hover:text-zinc-300"
+                ? "bg-[#24272A] text-white border border-[#3B4046] shadow-sm"
+                : "text-[#848C96] hover:text-[#F2F4F6]"
             )}
           >
             {tab === "upload" ? (
-              <Upload className="h-4 w-4" />
+              <Upload className="h-4 w-4 text-[#F6851B]" />
             ) : (
-              <Download className="h-4 w-4" />
+              <Download className="h-4 w-4 text-[#037DD6]" />
             )}
             {tab === "upload" ? "Encrypt & Upload" : "Retrieve & Decrypt"}
           </button>
@@ -41,7 +39,7 @@ export function VaultTabs() {
       </div>
 
       {/* Panel content — always mounted to preserve state on tab switch */}
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-950/80 backdrop-blur-xl p-6">
+      <div className="rounded-2xl border border-[#3B4046] bg-[#1E2024] shadow-2xl p-6 sm:p-8">
         <div className={activeTab === "upload" ? "block" : "hidden"}>
           <VaultUploadPanel />
         </div>

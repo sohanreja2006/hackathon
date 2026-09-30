@@ -308,42 +308,43 @@ export function RecentFiles() {
   );
 
   return (
-    <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/60 backdrop-blur-md overflow-hidden">
+    <div className="rounded-2xl border border-[#3b4046] bg-[#1e2024] shadow-xl shadow-black/20 overflow-hidden">
       {/* Table Header Controls */}
-      <div className="files-header-row p-5 border-b border-zinc-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="files-header-row p-5 border-b border-[#2e3238] bg-[#141618] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-3">
-            <h2 className="text-lg font-bold text-zinc-100 flex items-center gap-2">
+            <h2 className="text-lg font-bold text-[#f2f4f6] flex items-center gap-2">
               <span>Decentralized File Directory</span>
             </h2>
-            {/* Tab switchers */}
-            <div className="flex items-center gap-1 rounded-lg border border-zinc-800 bg-zinc-950 p-1">
+            {/* MetaMask Portfolio Tab switchers */}
+            <div className="flex items-center gap-1 rounded-xl border border-[#3b4046] bg-[#1e2024] p-1">
               <button
                 type="button"
                 onClick={() => setActiveTab("my_files")}
-                className={`px-3 py-1 text-xs font-mono rounded transition-colors ${
+                className={`px-3 py-1.5 text-xs font-mono rounded-lg transition-colors flex items-center gap-1.5 ${
                   activeTab === "my_files"
-                    ? "bg-cyan-500/20 text-cyan-300 font-semibold"
-                    : "text-zinc-400 hover:text-zinc-200"
+                    ? "bg-[#2b2f34] text-[#f2f4f6] font-bold border border-[#3b4046]"
+                    : "text-[#848c96] hover:text-[#f2f4f6]"
                 }`}
               >
-                My Vault ({myFiles.length})
+                <span className={`h-1.5 w-1.5 rounded-full ${activeTab === "my_files" ? "bg-[#f6851b]" : "bg-transparent"}`} />
+                <span>My Vault ({myFiles.length})</span>
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab("shared_with_me")}
-                className={`px-3 py-1 text-xs font-mono rounded transition-colors flex items-center gap-1.5 ${
+                className={`px-3 py-1.5 text-xs font-mono rounded-lg transition-colors flex items-center gap-1.5 ${
                   activeTab === "shared_with_me"
-                    ? "bg-purple-500/20 text-purple-300 font-semibold"
-                    : "text-zinc-400 hover:text-zinc-200"
+                    ? "bg-[#2b2f34] text-[#f2f4f6] font-bold border border-[#3b4046]"
+                    : "text-[#848c96] hover:text-[#f2f4f6]"
                 }`}
               >
-                <Users className="h-3 w-3" />
-                Shared With Me ({sharedFiles.length})
+                <Users className="h-3 w-3 text-[#037dd6]" />
+                <span>Shared With Me ({sharedFiles.length})</span>
               </button>
             </div>
           </div>
-          <p className="text-xs text-zinc-500 mt-1">
+          <p className="text-xs text-[#848c96] mt-1">
             {activeTab === "my_files"
               ? "Sovereign encrypted payloads pinned to IPFS nodes owned by your wallet"
               : "Peer-to-peer encrypted payloads shared with your wallet address"}
@@ -352,13 +353,13 @@ export function RecentFiles() {
 
         {/* Search Filter */}
         <div className="files-search-wrap relative max-w-xs w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-500" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#848c96]" />
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search by file or CID..."
-            className="w-full rounded-lg border border-zinc-800 bg-zinc-950/80 py-1.5 pl-8 pr-3 text-xs text-zinc-200 placeholder:text-zinc-600 focus:border-cyan-500/50 focus:outline-none"
+            className="w-full rounded-xl border border-[#3b4046] bg-[#1e2024] py-1.5 pl-8 pr-3 text-xs text-[#f2f4f6] placeholder:text-[#6a737d] focus:border-[#f6851b] focus:outline-none"
           />
         </div>
       </div>
@@ -413,7 +414,7 @@ export function RecentFiles() {
       {activeTab === "my_files" && (
         <div className="overflow-x-auto">
           <table className="file-table-mobile-card w-full text-left text-xs font-mono">
-            <thead className="border-b border-zinc-800 bg-zinc-950/60 text-zinc-400 uppercase text-[10px] tracking-wider">
+            <thead className="border-b border-[#2e3238] bg-[#141618] text-[#848c96] uppercase text-[10px] tracking-wider">
               <tr>
                 <th className="py-3 px-5">File Name & IPFS CID</th>
                 <th className="py-3 px-4">Size</th>
@@ -423,26 +424,26 @@ export function RecentFiles() {
                 <th className="py-3 px-5 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800/60">
+            <tbody className="divide-y divide-[#2e3238]">
               {filteredMyFiles.map((file) => (
-                <tr key={file.id} className="hover:bg-zinc-800/40 transition-colors group">
+                <tr key={file.id} className="hover:bg-[#24272a] transition-colors group">
                   {/* File Name & CID */}
-                  <td className="py-3.5 px-5 font-medium text-zinc-200">
+                  <td className="py-3.5 px-5 font-medium text-[#f2f4f6]">
                     <div className="flex items-center gap-2.5">
-                      <div className="h-8 w-8 rounded-lg bg-zinc-950 border border-zinc-800 flex items-center justify-center text-cyan-400 shrink-0">
+                      <div className="h-8 w-8 rounded-xl bg-[#141618] border border-[#3b4046] flex items-center justify-center text-[#f6851b] shrink-0">
                         <Lock className="h-3.5 w-3.5" />
                       </div>
                       <div className="flex flex-col min-w-0">
-                        <span className="truncate max-w-[200px] sm:max-w-xs font-sans text-xs font-semibold text-zinc-100 group-hover:text-cyan-300 transition-colors">
+                        <span className="truncate max-w-[200px] sm:max-w-xs font-sans text-xs font-semibold text-[#f2f4f6] group-hover:text-[#f6851b] transition-colors">
                           {file.fileName}
                         </span>
-                        <div className="flex items-center gap-2 text-[10px] text-zinc-500">
+                        <div className="flex items-center gap-2 text-[10px] text-[#848c96]">
                           <span>CID: {file.cid.substring(0, 8)}...{file.cid.slice(-6)}</span>
                           <button
                             onClick={() => handleCopy(file.cid, "cid")}
                             title="Copy IPFS CID"
                             type="button"
-                            className="hover:text-zinc-300"
+                            className="hover:text-[#f6851b]"
                           >
                             {copiedCid === file.cid ? (
                               <Check className="h-3 w-3 text-emerald-400" />
@@ -455,7 +456,7 @@ export function RecentFiles() {
                             target="_blank"
                             rel="noopener noreferrer"
                             title="View Raw Ciphertext on IPFS"
-                            className="hover:text-cyan-400 inline-flex items-center gap-0.5"
+                            className="hover:text-[#f6851b] inline-flex items-center gap-0.5"
                           >
                             <ExternalLink className="h-2.5 w-2.5" />
                           </a>
@@ -465,20 +466,20 @@ export function RecentFiles() {
                   </td>
 
                   {/* Size */}
-                  <td data-label="Size" className="py-3.5 px-4 text-zinc-400">
+                  <td data-label="Size" className="py-3.5 px-4 text-[#848c96]">
                     {formatBytes(file.fileSize)}
                   </td>
 
                   {/* Encryption Status */}
                   <td data-label="Encryption" className="py-3.5 px-4">
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-500/30 bg-cyan-950/40 px-2 py-0.5 text-[10px] text-cyan-300">
-                      <span className="h-1.5 w-1.5 rounded-full bg-cyan-400" />
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-[#f6851b]/35 bg-[#f6851b]/15 px-2.5 py-0.5 text-[10px] text-[#f6851b] font-semibold">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#f6851b]" />
                       AES-256-GCM
                     </span>
                   </td>
 
                   {/* Date */}
-                  <td data-label="Date" className="py-3.5 px-4 text-zinc-500 text-[11px]">
+                  <td data-label="Date" className="py-3.5 px-4 text-[#848c96] text-[11px]">
                     {new Date(file.uploadedAt).toLocaleDateString("en-US", {
                       month: "short",
                       day: "numeric",
@@ -487,13 +488,13 @@ export function RecentFiles() {
                   </td>
 
                   {/* Shares */}
-                  <td data-label="Shares" className="py-3.5 px-4 text-zinc-400 text-[11px]">
+                  <td data-label="Shares" className="py-3.5 px-4 text-[#848c96] text-[11px]">
                     {file.sharedWith && file.sharedWith.length > 0 ? (
-                      <span className="text-purple-400 font-medium">
+                      <span className="text-[#037dd6] font-medium">
                         {file.sharedWith.length} Peer{file.sharedWith.length > 1 ? "s" : ""}
                       </span>
                     ) : (
-                      <span className="text-zinc-600">Private</span>
+                      <span className="text-[#6a737d]">Private</span>
                     )}
                   </td>
 
@@ -506,7 +507,7 @@ export function RecentFiles() {
                         disabled={decryptingCid === file.cid}
                         type="button"
                         title="Decrypt file (requires AES-256 decryption key)"
-                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-cyan-500/30 bg-cyan-950/30 text-cyan-300 hover:bg-cyan-500/20 hover:border-cyan-400 transition-all font-sans text-xs font-semibold"
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#f6851b] hover:bg-[#e2761b] active:bg-[#cd6116] text-[#141618] transition-all font-sans text-xs font-bold shadow-sm shadow-[#f6851b]/20"
                       >
                         {decryptingCid === file.cid ? (
                           <Loader2 className="h-3 w-3 animate-spin" />
@@ -521,7 +522,7 @@ export function RecentFiles() {
                         onClick={() => handleInitiateShare(file)}
                         type="button"
                         title="Share Encrypted Key with Peer (FR-6)"
-                        className="p-1.5 rounded-lg border border-zinc-800 bg-zinc-950 text-zinc-400 hover:text-purple-400 hover:border-purple-500/30 transition-colors"
+                        className="p-1.5 rounded-xl border border-[#3b4046] bg-[#141618] text-[#848c96] hover:text-[#037dd6] hover:border-[#037dd6]/40 transition-colors"
                       >
                         <Share2 className="h-3.5 w-3.5" />
                       </button>
@@ -531,7 +532,7 @@ export function RecentFiles() {
                         onClick={() => handleCopy(file.keyHex, "key")}
                         type="button"
                         title="Copy AES-256 Hex Key"
-                        className="p-1.5 rounded-lg border border-zinc-800 bg-zinc-950 text-zinc-400 hover:text-amber-400 hover:border-amber-500/30 transition-colors"
+                        className="p-1.5 rounded-xl border border-[#3b4046] bg-[#141618] text-[#848c96] hover:text-[#f6851b] hover:border-[#f6851b]/40 transition-colors"
                       >
                         {copiedKey === file.keyHex ? (
                           <Check className="h-3.5 w-3.5 text-emerald-400" />
@@ -695,31 +696,39 @@ export function RecentFiles() {
       {/* ─────────────────────────────────────────────────────────────────────────────
           FR-6: Share with Peer Modal
           ───────────────────────────────────────────────────────────────────────────── */}
+      {/* ─────────────────────────────────────────────────────────────────────────────
+          FR-6: Share with Peer Modal (MetaMask Design)
+          ───────────────────────────────────────────────────────────────────────────── */}
       {sharingFile && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="responsive-modal w-full max-w-md rounded-xl border border-zinc-800 bg-zinc-900 p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
-              <div className="flex items-center gap-2 text-zinc-100 font-semibold">
-                <Share2 className="h-4 w-4 text-purple-400" />
-                <span>Share Encrypted File with Peer</span>
+          <div className="responsive-modal w-full max-w-md rounded-2xl border border-[#3B4046] bg-[#1E2024] p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[#2E3238]">
+              <div className="flex items-center gap-2.5 text-[#F2F4F6] font-semibold text-sm">
+                <div className="h-8 w-8 rounded-lg bg-[#F6851B]/15 border border-[#F6851B]/30 flex items-center justify-center text-[#F6851B]">
+                  <Share2 className="h-4 w-4" />
+                </div>
+                <div>
+                  <span className="font-bold text-white">Share with Peer</span>
+                  <p className="text-[11px] text-[#848C96] font-normal">Re-encrypt key for recipient Ethereum address</p>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={() => setSharingFile(null)}
-                className="text-zinc-500 hover:text-zinc-300"
+                className="text-[#848C96] hover:text-white p-1 rounded-lg hover:bg-[#2B2F34] transition-colors"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="space-y-1.5 bg-zinc-950/60 p-3 rounded-lg border border-zinc-800/60 text-xs font-mono">
-              <div className="text-zinc-400 truncate">File: <span className="text-zinc-200 font-semibold">{sharingFile.fileName}</span></div>
-              <div className="text-zinc-500 truncate">CID: {sharingFile.cid}</div>
+            <div className="space-y-1.5 bg-[#141618] p-3 rounded-xl border border-[#2E3238] text-xs font-mono">
+              <div className="text-[#848C96] truncate">File: <span className="text-[#F2F4F6] font-semibold">{sharingFile.fileName}</span></div>
+              <div className="text-[#848C96] truncate text-[11px]">CID: <span className="text-[#037DD6]">{sharingFile.cid}</span></div>
             </div>
 
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-mono text-zinc-300 mb-1">
+                <label className="block text-xs font-medium text-[#F2F4F6] mb-1">
                   Recipient Ethereum Address (0x...)
                 </label>
                 <input
@@ -727,12 +736,12 @@ export function RecentFiles() {
                   value={recipientInput}
                   onChange={(e) => setRecipientInput(e.target.value)}
                   placeholder="0x71C... or recipient wallet"
-                  className="w-full rounded-lg border border-zinc-800 bg-zinc-950 py-2 px-3 text-xs font-mono text-zinc-100 placeholder:text-zinc-600 focus:border-purple-500 focus:outline-none"
+                  className="w-full rounded-xl border border-[#3B4046] bg-[#141618] py-2 px-3 text-xs font-mono text-[#F2F4F6] placeholder:text-[#848C96] focus:border-[#F6851B] focus:ring-1 focus:ring-[#F6851B] focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-mono text-zinc-400 mb-1">
+                <label className="block text-xs font-medium text-[#848C96] mb-1">
                   Access Note (Optional)
                 </label>
                 <input
@@ -740,30 +749,30 @@ export function RecentFiles() {
                   value={shareNote}
                   onChange={(e) => setShareNote(e.target.value)}
                   placeholder="e.g., Confidential Q3 Audit for Review"
-                  className="w-full rounded-lg border border-zinc-800 bg-zinc-950 py-1.5 px-3 text-xs text-zinc-200 placeholder:text-zinc-600 focus:border-purple-500 focus:outline-none"
+                  className="w-full rounded-xl border border-[#3B4046] bg-[#141618] py-2 px-3 text-xs text-[#F2F4F6] placeholder:text-[#848C96] focus:border-[#F6851B] focus:ring-1 focus:ring-[#F6851B] focus:outline-none"
                 />
               </div>
             </div>
 
             {shareError && (
-              <div className="flex items-center gap-2 p-2.5 rounded-lg border border-red-500/30 bg-red-950/20 text-xs text-red-400">
+              <div className="flex items-center gap-2 p-2.5 rounded-xl border border-red-500/30 bg-red-950/20 text-xs text-red-400">
                 <AlertCircle className="h-3.5 w-3.5 shrink-0" />
                 <span>{shareError}</span>
               </div>
             )}
 
             {shareSuccess && (
-              <div className="flex items-center gap-2 p-2.5 rounded-lg border border-emerald-500/30 bg-emerald-950/20 text-xs text-emerald-400">
+              <div className="flex items-center gap-2 p-2.5 rounded-xl border border-emerald-500/30 bg-emerald-950/20 text-xs text-emerald-400">
                 <Check className="h-3.5 w-3.5 shrink-0" />
                 <span>Re-encrypted file key & granted access to peer!</span>
               </div>
             )}
 
-            <div className="flex items-center justify-end gap-2 pt-2">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#2E3238]">
               <button
                 type="button"
                 onClick={() => setSharingFile(null)}
-                className="px-3 py-1.5 text-xs text-zinc-400 hover:text-zinc-200"
+                className="px-3.5 py-2 text-xs font-medium text-[#848C96] hover:text-[#F2F4F6] rounded-xl hover:bg-[#2B2F34] transition-colors"
               >
                 Cancel
               </button>
@@ -771,7 +780,7 @@ export function RecentFiles() {
                 type="button"
                 onClick={handleExecuteShare}
                 disabled={isSharing || shareSuccess}
-                className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold shadow-lg shadow-purple-900/30 transition-all disabled:opacity-50"
+                className="flex items-center gap-2 px-5 py-2 rounded-xl bg-[#F6851B] hover:bg-[#E2761B] text-white text-xs font-semibold shadow-sm transition-all disabled:opacity-50"
               >
                 {isSharing ? (
                   <>
@@ -791,57 +800,57 @@ export function RecentFiles() {
       )}
 
       {/* ─────────────────────────────────────────────────────────────────────────────
-          Decrypt Key Prompt Modal
+          Decrypt Key Prompt Modal (MetaMask Design)
           Prompts user for AES-256 key before decrypting and downloading
           ───────────────────────────────────────────────────────────────────────────── */}
       {decryptModalFile && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="responsive-modal w-full max-w-lg rounded-xl border border-zinc-800 bg-zinc-900 p-6 shadow-2xl space-y-4">
+          <div className="responsive-modal w-full max-w-lg rounded-2xl border border-[#3B4046] bg-[#1E2024] p-6 shadow-2xl space-y-4">
             {/* Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
-              <div className="flex items-center gap-2.5 text-zinc-100 font-semibold">
-                <div className="h-8 w-8 rounded-lg bg-cyan-950/60 border border-cyan-800/60 flex items-center justify-center text-cyan-400">
+            <div className="flex items-center justify-between pb-3 border-b border-[#2E3238]">
+              <div className="flex items-center gap-2.5 text-[#F2F4F6] font-semibold">
+                <div className="h-8 w-8 rounded-lg bg-[#F6851B]/15 border border-[#F6851B]/30 flex items-center justify-center text-[#F6851B]">
                   <KeyRound className="h-4 w-4" />
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-white">Enter Decryption Key</h3>
-                  <p className="text-[11px] text-zinc-400 font-normal">Zero-knowledge client-side decryption</p>
+                  <p className="text-[11px] text-[#848C96] font-normal">Zero-knowledge client-side decryption</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={handleCloseDecryptModal}
                 disabled={isDecryptingModal}
-                className="text-zinc-500 hover:text-zinc-300 disabled:opacity-50 p-1 rounded-lg hover:bg-zinc-800/50 transition-colors"
+                className="text-[#848C96] hover:text-[#F2F4F6] disabled:opacity-50 p-1 rounded-lg hover:bg-[#2B2F34] transition-colors"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
             {/* Target File Overview */}
-            <div className="p-3 rounded-lg bg-zinc-950/80 border border-zinc-800/80 space-y-1.5 text-xs font-mono">
-              <div className="flex justify-between items-center text-zinc-300">
-                <span className="text-zinc-500 font-sans">File Name:</span>
+            <div className="p-3.5 rounded-xl bg-[#141618] border border-[#2E3238] space-y-2 text-xs font-mono">
+              <div className="flex justify-between items-center text-[#F2F4F6]">
+                <span className="text-[#848C96] font-sans">File Name:</span>
                 <span className="font-semibold text-white truncate max-w-[260px]">{decryptModalFile.fileName}</span>
               </div>
-              <div className="flex justify-between items-center text-zinc-400">
-                <span className="text-zinc-500 font-sans">IPFS CID:</span>
-                <span className="truncate max-w-[260px] text-zinc-400 font-mono text-[11px]">{decryptModalFile.cid}</span>
+              <div className="flex justify-between items-center text-[#848C96]">
+                <span className="text-[#848C96] font-sans">IPFS CID:</span>
+                <span className="truncate max-w-[260px] text-[#037DD6] font-mono text-[11px]">{decryptModalFile.cid}</span>
               </div>
-              <div className="flex justify-between items-center text-zinc-400">
-                <span className="text-zinc-500 font-sans">Payload Size:</span>
-                <span>{formatBytes(decryptModalFile.fileSize)}</span>
+              <div className="flex justify-between items-center text-[#848C96]">
+                <span className="text-[#848C96] font-sans">Payload Size:</span>
+                <span className="text-[#F2F4F6]">{formatBytes(decryptModalFile.fileSize)}</span>
               </div>
-              <div className="flex justify-between items-center text-zinc-400">
-                <span className="text-zinc-500 font-sans">Algorithm:</span>
-                <span className="text-cyan-400">AES-256-GCM (Authenticated)</span>
+              <div className="flex justify-between items-center text-[#848C96]">
+                <span className="text-[#848C96] font-sans">Algorithm:</span>
+                <span className="text-[#F6851B]">AES-256-GCM (Authenticated)</span>
               </div>
             </div>
 
             {/* Key Input Section */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-zinc-200">
+                <label className="text-xs font-semibold text-[#F2F4F6]">
                   AES-256 Key (64 hex characters)
                 </label>
                 {decryptModalFile.keyHex && (
@@ -851,7 +860,7 @@ export function RecentFiles() {
                       setManualKeyInput(decryptModalFile.keyHex);
                       setDecryptModalError(null);
                     }}
-                    className="text-[11px] font-mono text-cyan-400 hover:text-cyan-300 flex items-center gap-1 underline underline-offset-2"
+                    className="text-[11px] font-medium text-[#F6851B] hover:text-[#E2761B] flex items-center gap-1 underline underline-offset-2"
                   >
                     <span>Use Saved Vault Key</span>
                   </button>
@@ -866,18 +875,18 @@ export function RecentFiles() {
                     setDecryptModalError(null);
                   }}
                   placeholder="Paste 64-character hexadecimal AES key..."
-                  className="w-full rounded-lg border border-zinc-800 bg-zinc-950 py-2.5 pl-3 pr-10 text-xs font-mono text-zinc-100 placeholder:text-zinc-600 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                  className="w-full rounded-xl border border-[#3B4046] bg-[#141618] py-2.5 pl-3 pr-10 text-xs font-mono text-[#F2F4F6] placeholder:text-[#848C96] focus:border-[#F6851B] focus:ring-1 focus:ring-[#F6851B] focus:outline-none"
                 />
                 <button
                   type="button"
                   onClick={() => setShowKeyInput(!showKeyInput)}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-200"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#848C96] hover:text-white"
                 >
                   {showKeyInput ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
 
-              <div className="flex items-center justify-between text-[11px] font-mono text-zinc-500">
+              <div className="flex items-center justify-between text-[11px] font-mono text-[#848C96]">
                 <span>Key length: {manualKeyInput.length} / 64 hex characters</span>
                 {manualKeyInput.length === 64 && /^[0-9a-fA-F]{64}$/.test(manualKeyInput) ? (
                   <span className="text-emerald-400 flex items-center gap-1 font-sans">
@@ -889,19 +898,19 @@ export function RecentFiles() {
 
             {/* Error Message */}
             {decryptModalError && (
-              <div className="flex items-start gap-2 p-3 rounded-lg border border-red-500/40 bg-red-950/20 text-xs text-red-400">
+              <div className="flex items-start gap-2 p-3 rounded-xl border border-red-500/40 bg-red-950/20 text-xs text-red-400">
                 <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
                 <span>{decryptModalError}</span>
               </div>
             )}
 
             {/* Modal Actions */}
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-800">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#2E3238]">
               <button
                 type="button"
                 onClick={handleCloseDecryptModal}
                 disabled={isDecryptingModal}
-                className="px-4 py-2 text-xs font-medium text-zinc-400 hover:text-zinc-200 rounded-lg hover:bg-zinc-800/50 transition-colors disabled:opacity-50"
+                className="px-4 py-2 text-xs font-medium text-[#848C96] hover:text-[#F2F4F6] rounded-xl hover:bg-[#2B2F34] transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -909,7 +918,7 @@ export function RecentFiles() {
                 type="button"
                 disabled={manualKeyInput.length !== 64 || isDecryptingModal}
                 onClick={handleConfirmDecryptWithKey}
-                className="flex items-center gap-2 px-5 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-zinc-950 font-bold text-xs shadow-lg shadow-cyan-950/50 transition-all disabled:opacity-50 disabled:pointer-events-none"
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#F6851B] hover:bg-[#E2761B] text-white font-bold text-xs shadow-md transition-all disabled:opacity-50 disabled:pointer-events-none"
               >
                 {isDecryptingModal ? (
                   <>

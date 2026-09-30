@@ -4,71 +4,71 @@ import { ShieldCheck, Lock, Terminal, Radio } from "lucide-react";
 
 export function Footer() {
   return (
-    <footer className="border-t border-zinc-800/80 bg-zinc-950/90 text-zinc-400 text-xs">
+    <footer className="border-t border-[#3B4046] bg-[#141618] text-[#848C96] text-xs">
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
           {/* Brand Col */}
           <div className="md:col-span-1 space-y-3">
             <div className="flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-md border border-cyan-500/40 bg-zinc-900">
-                <ShieldCheck className="h-4 w-4 text-cyan-400" />
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-[#F6851B]/40 bg-[#1E2024] text-base">
+                🦊
               </div>
-              <span className="font-mono text-sm font-bold tracking-wider text-zinc-100">
-                CYBER<span className="text-cyan-400">-10</span>
+              <span className="font-sans text-sm font-black tracking-wider text-white">
+                Vault<span className="text-[#F6851B]">X</span>
               </span>
             </div>
-            <p className="text-zinc-500 text-xs leading-relaxed">
+            <p className="text-[#848C96] text-xs leading-relaxed">
               Decentralized, zero-knowledge file encryption and verifiable storage.
-              Engineered for absolute data sovereignty.
+              Engineered with MetaMask portfolio design standards for sovereign privacy.
             </p>
-            <div className="inline-flex items-center gap-2 rounded-full border border-cyan-500/30 bg-cyan-950/40 px-2.5 py-1 text-[11px] font-mono text-cyan-300">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#F6851B]/30 bg-[#F6851B]/10 px-2.5 py-1 text-[11px] font-mono text-[#F6851B]">
               <span className="relative flex h-1.5 w-1.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-cyan-400"></span>
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#F6851B] opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#F6851B]"></span>
               </span>
-              Phase 1 Active (Frontend & Wallet)
+              MetaMask Connected Standard
             </div>
           </div>
 
           {/* Protocol Architecture */}
           <div>
-            <h4 className="font-mono text-xs uppercase tracking-wider text-zinc-200 mb-3 flex items-center gap-1.5">
-              <Lock className="h-3.5 w-3.5 text-cyan-400" />
+            <h4 className="font-mono text-xs uppercase tracking-wider text-[#F2F4F6] mb-3 flex items-center gap-1.5">
+              <Lock className="h-3.5 w-3.5 text-[#F6851B]" />
               Security Architecture
             </h4>
-            <ul className="space-y-2 text-zinc-500">
-              <li className="hover:text-zinc-300 transition-colors">Client-Side AES-GCM-256</li>
-              <li className="hover:text-zinc-300 transition-colors">EIP-4361 SIWE Identity (Phase 2)</li>
-              <li className="hover:text-zinc-300 transition-colors">IPFS Content Addressing (Phase 4)</li>
-              <li className="hover:text-zinc-300 transition-colors">Zero-Knowledge Key Derivation</li>
+            <ul className="space-y-2 text-[#848C96]">
+              <li className="hover:text-[#F2F4F6] transition-colors">Client-Side AES-256-GCM</li>
+              <li className="hover:text-[#F2F4F6] transition-colors">MetaMask SIWE Cryptographic Verification</li>
+              <li className="hover:text-[#F2F4F6] transition-colors">IPFS Distributed Gateway Storage</li>
+              <li className="hover:text-[#F2F4F6] transition-colors">Zero-Custody Local Key Wrapping</li>
             </ul>
           </div>
 
           {/* Navigation */}
           <div>
-            <h4 className="font-mono text-xs uppercase tracking-wider text-zinc-200 mb-3 flex items-center gap-1.5">
-              <Terminal className="h-3.5 w-3.5 text-emerald-400" />
+            <h4 className="font-mono text-xs uppercase tracking-wider text-[#F2F4F6] mb-3 flex items-center gap-1.5">
+              <Terminal className="h-3.5 w-3.5 text-[#037DD6]" />
               Application
             </h4>
-            <ul className="space-y-2 text-zinc-500">
+            <ul className="space-y-2 text-[#848C96]">
               <li>
-                <Link href="/" className="hover:text-zinc-300 transition-colors">
+                <Link href="/" className="hover:text-[#F2F4F6] transition-colors">
                   Overview
                 </Link>
               </li>
               <li>
-                <Link href="/dashboard" className="hover:text-zinc-300 transition-colors">
+                <Link href="/dashboard" className="hover:text-[#F2F4F6] transition-colors">
                   Encrypted Vault Dashboard
                 </Link>
               </li>
               <li>
-                <Link href="/#how-it-works" className="hover:text-zinc-300 transition-colors">
-                  Workflow Guide
+                <Link href="/dashboard/encrypt" className="hover:text-[#F2F4F6] transition-colors">
+                  Local Encryption Engine
                 </Link>
               </li>
               <li>
-                <Link href="/#security" className="hover:text-zinc-300 transition-colors">
-                  Threat Model & Assurances
+                <Link href="/dashboard/vault" className="hover:text-[#F2F4F6] transition-colors">
+                  IPFS Decentralized Vault
                 </Link>
               </li>
             </ul>
@@ -76,32 +76,32 @@ export function Footer() {
 
           {/* Hackathon Specs */}
           <div>
-            <h4 className="font-mono text-xs uppercase tracking-wider text-zinc-200 mb-3 flex items-center gap-1.5">
-              <Radio className="h-3.5 w-3.5 text-purple-400" />
-              Project Blueprint
+            <h4 className="font-mono text-xs uppercase tracking-wider text-[#F2F4F6] mb-3 flex items-center gap-1.5">
+              <Radio className="h-3.5 w-3.5 text-[#F6851B]" />
+              Sovereign Blueprint
             </h4>
-            <div className="rounded-lg border border-zinc-800 bg-zinc-900/60 p-3 space-y-2">
+            <div className="rounded-xl border border-[#3B4046] bg-[#1E2024] p-3 space-y-2">
               <div className="flex justify-between items-center text-[11px] font-mono">
-                <span className="text-zinc-400">Target Track:</span>
-                <span className="text-zinc-200">Web3 / Cybersecurity</span>
+                <span className="text-[#848C96]">Primary Wallet:</span>
+                <span className="text-[#F6851B] font-semibold">MetaMask</span>
               </div>
               <div className="flex justify-between items-center text-[11px] font-mono">
-                <span className="text-zinc-400">Current Scope:</span>
-                <span className="text-cyan-400">Phase 1 Foundation</span>
+                <span className="text-[#848C96]">Encryption:</span>
+                <span className="text-white font-medium">AES-256-GCM</span>
               </div>
               <div className="flex justify-between items-center text-[11px] font-mono">
-                <span className="text-zinc-400">Private Keys:</span>
-                <span className="text-emerald-400">Non-Custodial</span>
+                <span className="text-[#848C96]">Storage Layer:</span>
+                <span className="text-[#037DD6] font-medium">IPFS Decentralized</span>
               </div>
             </div>
           </div>
         </div>
 
         {/* Bottom Bar */}
-        <div className="pt-8 border-t border-zinc-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-zinc-500 text-[11px]">
-          <p>© 2026 CYBER-10 Protocol. Non-custodial, client-encrypted architecture.</p>
-          <p className="font-mono text-zinc-600">
-            SHA256: 9b2d8f...4e10 • All telemetry encrypted
+        <div className="pt-8 border-t border-[#2E3238] flex flex-col sm:flex-row items-center justify-between gap-4 text-[#848C96] text-[11px]">
+          <p>© 2026 VaultX. Sovereign Web3 Architecture styled with MetaMask Design System.</p>
+          <p className="font-mono text-[#848C96]">
+            SIWE Auth Active • Client-Side Zero Knowledge
           </p>
         </div>
       </div>

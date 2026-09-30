@@ -30,52 +30,52 @@ export default function DashboardPage() {
         {/* Main Dashboard Dynamic Stat Cards */}
         <DashboardStats />
 
-        {/* Action Banner — Phase 3 Live */}
-        <div className="action-banner mb-8 rounded-xl border border-cyan-500/20 bg-gradient-to-r from-cyan-950/30 via-zinc-900/60 to-zinc-900/40 p-5 backdrop-blur-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        {/* Action Banner — Client-Side Encryption */}
+        <div className="action-banner mb-6 rounded-2xl border border-[#3b4046] bg-[#1e2024] p-5 backdrop-blur-md flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg shadow-black/20 hover:border-[#f6851b]/40 transition-all">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
-                <UploadCloud className="h-4 w-4 text-cyan-400" />
+              <span className="text-sm font-bold text-[#f2f4f6] flex items-center gap-2">
+                <UploadCloud className="h-4 w-4 text-[#f6851b]" />
                 Client-Side AES-256-GCM Encryption
               </span>
-              <span className="text-[10px] font-mono uppercase bg-cyan-500/20 px-2 py-0.5 rounded text-cyan-300 border border-cyan-500/30">
-                Phase 3 · Live
+              <span className="text-[10px] font-mono uppercase bg-[#f6851b]/15 px-2 py-0.5 rounded-full text-[#f6851b] border border-[#f6851b]/30 font-semibold">
+                Protected
               </span>
             </div>
-            <p className="text-xs text-zinc-400">
+            <p className="text-xs text-[#848c96]">
               Encrypt or decrypt any file locally in your browser. Your plaintext never leaves your device.
             </p>
           </div>
 
           <Link
             href="/dashboard/encrypt"
-            className="action-banner-btn inline-flex items-center justify-center gap-1.5 h-8 rounded-md px-3 text-xs relative overflow-hidden bg-gradient-to-r from-cyan-600 via-cyan-500 to-emerald-500 text-zinc-950 font-semibold hover:brightness-110 active:scale-[0.98] shadow-md shadow-cyan-950/40 border border-cyan-400/30 shrink-0 transition-all duration-200"
+            className="action-banner-btn inline-flex items-center justify-center gap-1.5 h-9 rounded-xl px-4 text-xs bg-[#f6851b] hover:bg-[#e2761b] active:bg-[#cd6116] text-[#141618] font-bold shadow-md shadow-[#f6851b]/20 shrink-0 transition-all active:scale-[0.98]"
           >
             <Plus className="h-3.5 w-3.5" />
             <span>Encrypt a File</span>
           </Link>
         </div>
 
-        {/* Action Banner — Phase 4 Live: Encrypted IPFS Vault */}
-        <div className="action-banner mb-8 rounded-xl border border-violet-500/20 bg-gradient-to-r from-violet-950/30 via-zinc-900/60 to-zinc-900/40 p-5 backdrop-blur-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        {/* Action Banner — Encrypted IPFS Vault */}
+        <div className="action-banner mb-8 rounded-2xl border border-[#3b4046] bg-[#1e2024] p-5 backdrop-blur-md flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg shadow-black/20 hover:border-[#037dd6]/40 transition-all">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
-                <UploadCloud className="h-4 w-4 text-violet-400" />
-                Encrypt & Store on IPFS
+              <span className="text-sm font-bold text-[#f2f4f6] flex items-center gap-2">
+                <UploadCloud className="h-4 w-4 text-[#037dd6]" />
+                Encrypt & Store on Decentralized IPFS
               </span>
-              <span className="text-[10px] font-mono uppercase bg-violet-500/20 px-2 py-0.5 rounded text-violet-300 border border-violet-500/30">
-                Phase 4 · Live
+              <span className="text-[10px] font-mono uppercase bg-[#037dd6]/15 px-2 py-0.5 rounded-full text-[#038ff0] border border-[#037dd6]/30 font-semibold">
+                Pinata IPFS
               </span>
             </div>
-            <p className="text-xs text-zinc-400">
-              Encrypt a file and upload the ciphertext to decentralized IPFS storage via Pinata. Get a permanent CID.
+            <p className="text-xs text-[#848c96]">
+              Encrypt a file and upload ciphertext to decentralized IPFS storage. Retrieve anytime with your key.
             </p>
           </div>
 
           <Link
             href="/dashboard/vault"
-            className="action-banner-btn inline-flex items-center justify-center gap-1.5 h-8 rounded-md px-3 text-xs relative overflow-hidden bg-gradient-to-r from-violet-600 via-violet-500 to-fuchsia-500 text-white font-semibold hover:brightness-110 active:scale-[0.98] shadow-md shadow-violet-950/40 border border-violet-400/30 shrink-0 transition-all duration-200"
+            className="action-banner-btn inline-flex items-center justify-center gap-1.5 h-9 rounded-xl px-4 text-xs bg-[#037dd6] hover:bg-[#038ff0] text-white font-bold shadow-md shadow-[#037dd6]/20 shrink-0 transition-all active:scale-[0.98]"
           >
             <Plus className="h-3.5 w-3.5" />
             <span>Open Vault</span>

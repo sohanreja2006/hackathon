@@ -33,8 +33,9 @@ export function Web3Provider({ children }: Web3ProviderProps) {
         <RainbowKitProvider
           modalSize="compact"
           theme={midnightTheme({
-            accentColor: "#06b6d4",           // Cyan 500
-            accentColorForeground: "#09090b", // Zinc 950
+            accentColor: "#F6851B",           // MetaMask Fox Orange
+            accentColorForeground: "#ffffff", // Pure White
+            borderRadius: "large",
             fontStack: "system",
             overlayBlur: "small",
           })}

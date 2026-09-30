@@ -20,42 +20,38 @@ export function Hero() {
 
   return (
     <section className="relative overflow-hidden pt-12 pb-20 md:pt-20 md:pb-32">
-      {/* Subtle cybersecurity background grid and ambient lighting */}
+      {/* Subtle MetaMask background ambient lighting */}
       <div className="absolute inset-0 -z-10 pointer-events-none">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-gradient-to-b from-cyan-500/10 via-emerald-500/5 to-transparent blur-3xl opacity-70" />
-        <div className="absolute inset-0 bg-[radial-gradient(#27272a_1px,transparent_1px)] [background-size:24px_24px] opacity-30" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-gradient-to-b from-[#F6851B]/15 via-[#037DD6]/5 to-transparent blur-3xl opacity-70" />
+        <div className="absolute inset-0 bg-[radial-gradient(#2E3238_1px,transparent_1px)] [background-size:24px_24px] opacity-40" />
       </div>
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
           {/* Left Column: Headline and CTAs */}
           <div className="lg:col-span-7 space-y-6 text-center lg:text-left">
-            {/* Cybersecurity pill tag */}
-            <div className="inline-flex items-center gap-2 rounded-full border border-cyan-500/30 bg-cyan-950/40 px-3 py-1 text-xs font-mono text-cyan-300">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-400"></span>
-              </span>
-              <span>CYBER-10 Protocol • Phase 1 Foundation</span>
+            {/* MetaMask pill tag */}
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#F6851B]/40 bg-[#F6851B]/15 px-3 py-1 text-xs font-mono text-[#F6851B]">
+              <span className="text-sm">🦊</span>
+              <span className="font-bold">METAMASK Sovereign Web3 Vault</span>
             </div>
 
             {/* Main Headline */}
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-zinc-100 font-sans leading-[1.15]">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-white font-sans leading-[1.15]">
               Your Files. <br className="hidden sm:inline" />
-              <span className="bg-gradient-to-r from-cyan-400 via-teal-300 to-emerald-400 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-[#F6851B] to-[#FFA857] bg-clip-text text-transparent">
                 Encrypted.
               </span>{" "}
               Decentralized.{" "}
-              <span className="text-zinc-100 underline decoration-cyan-500/40 decoration-wavy">
+              <span className="text-white underline decoration-[#F6851B]/50 decoration-wavy">
                 Yours.
               </span>
             </h1>
 
             {/* Supporting Text */}
-            <p className="max-w-2xl text-base sm:text-lg text-zinc-400 leading-relaxed mx-auto lg:mx-0">
-              CYBER-10 is a decentralized secure file storage and sharing platform where users
-              maintain complete, sovereign control of their data. Zero-knowledge local encryption ensures
-              that no cloud provider, intermediary, or unauthorized actor can ever inspect your files.
+            <p className="max-w-2xl text-base sm:text-lg text-[#848C96] leading-relaxed mx-auto lg:mx-0">
+              VaultX is a decentralized sovereign file vault secured by MetaMask and dual-layer Google OAuth.
+              Client-side AES-256-GCM encryption guarantees zero server custody — your plaintext never leaves your device.
             </p>
 
             {/* CTAs */}
@@ -63,10 +59,10 @@ export function Hero() {
               {/* Primary CTA */}
               {isConnected ? (
                 <Link href="/dashboard" className="w-full sm:w-auto">
-                  <Button size="lg" variant="cyber" className="w-full sm:w-auto gap-2">
-                    <span>Open Encrypted Dashboard</span>
+                  <button className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-[#F6851B] hover:bg-[#E2761B] text-white font-bold text-sm shadow-md transition-all active:scale-[0.98]">
+                    <span>Open Sovereign Dashboard</span>
                     <ArrowRight className="h-4 w-4" />
-                  </Button>
+                  </button>
                 </Link>
               ) : (
                 <div className="w-full sm:w-auto flex justify-center">
@@ -76,26 +72,26 @@ export function Hero() {
 
               {/* Secondary CTA */}
               <Link href="/dashboard" className="w-full sm:w-auto">
-                <Button size="lg" variant="outline" className="w-full sm:w-auto gap-2">
+                <button className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl border border-[#3B4046] bg-[#24272A] hover:bg-[#2B2F34] text-white font-semibold text-sm transition-all">
                   <span>Explore Dashboard</span>
-                  <ArrowRight className="h-4 w-4 text-zinc-500" />
-                </Button>
+                  <ArrowRight className="h-4 w-4 text-[#848C96]" />
+                </button>
               </Link>
             </div>
 
             {/* Security Guarantee Micro-Bullets */}
-            <div className="pt-6 border-t border-zinc-800/60 grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs font-mono text-zinc-400">
+            <div className="pt-6 border-t border-[#2E3238] grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs font-mono text-[#848C96]">
               <div className="flex items-center gap-1.5">
                 <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
-                <span>Zero Server Custody</span>
+                <span className="text-[#F2F4F6]">Zero Server Custody</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="h-3.5 w-3.5 text-cyan-400 shrink-0" />
-                <span>AES-GCM-256 Ready</span>
+                <CheckCircle2 className="h-3.5 w-3.5 text-[#F6851B] shrink-0" />
+                <span className="text-[#F2F4F6]">AES-256-GCM Engine</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="h-3.5 w-3.5 text-purple-400 shrink-0" />
-                <span>EVM Wallet Identity</span>
+                <CheckCircle2 className="h-3.5 w-3.5 text-[#037DD6] shrink-0" />
+                <span className="text-[#F2F4F6]">MetaMask SIWE Identity</span>
               </div>
             </div>
           </div>
@@ -104,104 +100,104 @@ export function Hero() {
           <div className="lg:col-span-5 relative">
             <div className="relative mx-auto max-w-md lg:max-w-none">
               {/* Decorative Glow */}
-              <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-cyan-500/20 via-emerald-500/20 to-purple-500/20 blur-xl opacity-60" />
+              <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-[#F6851B]/20 via-[#037DD6]/20 to-[#F6851B]/10 blur-xl opacity-60" />
 
               {/* Terminal / Secure Storage Vault Simulator Card */}
-              <div className="relative rounded-2xl border border-zinc-800 bg-zinc-950/90 p-5 shadow-2xl backdrop-blur-xl">
+              <div className="relative rounded-2xl border border-[#3B4046] bg-[#1E2024] p-5 shadow-2xl backdrop-blur-xl">
                 {/* Window Bar */}
-                <div className="flex items-center justify-between border-b border-zinc-800/80 pb-3 mb-4">
+                <div className="flex items-center justify-between border-b border-[#2E3238] pb-3 mb-4">
                   <div className="flex items-center gap-2">
                     <div className="h-3 w-3 rounded-full bg-rose-500/80" />
                     <div className="h-3 w-3 rounded-full bg-amber-500/80" />
                     <div className="h-3 w-3 rounded-full bg-emerald-500/80" />
-                    <span className="ml-2 font-mono text-xs text-zinc-400">
-                      CYBER10_VAULT_ENGINE v1.0
+                    <span className="ml-2 font-mono text-xs text-[#848C96]">
+                      METAMASK_VAULT_ENGINE v2.4
                     </span>
                   </div>
-                  <div className="inline-flex items-center gap-1.5 rounded bg-zinc-900 px-2 py-0.5 text-[10px] font-mono text-emerald-400 border border-zinc-800">
+                  <div className="inline-flex items-center gap-1.5 rounded-lg bg-[#141618] px-2 py-0.5 text-[10px] font-mono text-emerald-400 border border-[#3B4046]">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    NODE READY
+                    SOVEREIGN
                   </div>
                 </div>
 
                 {/* Storage Pipeline Visualization */}
                 <div className="space-y-3 font-mono text-xs">
                   {/* Step 1: Plaintext payload */}
-                  <div className="rounded-lg border border-zinc-800/90 bg-zinc-900/60 p-3 flex items-center justify-between">
+                  <div className="rounded-xl border border-[#3B4046] bg-[#141618] p-3 flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                      <div className="h-8 w-8 rounded-md bg-zinc-800 flex items-center justify-center text-zinc-300">
+                      <div className="h-8 w-8 rounded-lg bg-[#24272A] border border-[#3B4046] flex items-center justify-center text-[#F2F4F6]">
                         <FileCode2 className="h-4 w-4" />
                       </div>
                       <div>
-                        <div className="text-zinc-200 font-semibold">confidential_audit.pdf</div>
-                        <div className="text-[10px] text-zinc-500">2.4 MB • Local Buffer</div>
+                        <div className="text-[#F2F4F6] font-semibold">confidential_audit.pdf</div>
+                        <div className="text-[10px] text-[#848C96]">2.4 MB • Local Memory</div>
                       </div>
                     </div>
-                    <span className="text-[10px] text-amber-400 bg-amber-950/40 px-2 py-0.5 rounded border border-amber-500/30">
-                      Unencrypted
+                    <span className="text-[10px] text-[#848C96] bg-[#24272A] px-2 py-0.5 rounded border border-[#3B4046]">
+                      Plaintext
                     </span>
                   </div>
 
                   {/* Flow Arrow */}
-                  <div className="flex items-center justify-center gap-2 text-zinc-500 text-[10px]">
-                    <div className="h-px bg-zinc-800 flex-1" />
-                    <span className="flex items-center gap-1 text-cyan-400">
-                      <Lock className="h-3 w-3" /> Client-Side Encryption
+                  <div className="flex items-center justify-center gap-2 text-[#848C96] text-[10px]">
+                    <div className="h-px bg-[#2E3238] flex-1" />
+                    <span className="flex items-center gap-1 text-[#F6851B] font-semibold">
+                      <Lock className="h-3 w-3" /> Client-Side AES-256
                     </span>
-                    <div className="h-px bg-zinc-800 flex-1" />
+                    <div className="h-px bg-[#2E3238] flex-1" />
                   </div>
 
                   {/* Step 2: Encrypted Cipherblock */}
-                  <div className="rounded-lg border border-cyan-500/30 bg-cyan-950/20 p-3 flex items-center justify-between">
+                  <div className="rounded-xl border border-[#F6851B]/40 bg-[#F6851B]/10 p-3 flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                      <div className="h-8 w-8 rounded-md bg-cyan-950/60 border border-cyan-500/40 flex items-center justify-center text-cyan-300">
+                      <div className="h-8 w-8 rounded-lg bg-[#F6851B]/20 border border-[#F6851B]/40 flex items-center justify-center text-[#F6851B]">
                         <Lock className="h-4 w-4" />
                       </div>
                       <div>
-                        <div className="text-cyan-300 font-semibold">9f8b4c7e...3a1d.enc</div>
-                        <div className="text-[10px] text-zinc-400">Cipher: AES-GCM-256</div>
+                        <div className="text-[#F6851B] font-semibold">9f8b4c7e...3a1d.enc</div>
+                        <div className="text-[10px] text-[#848C96]">Authenticated: AES-GCM</div>
                       </div>
                     </div>
-                    <span className="text-[10px] text-cyan-300 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-500/30">
+                    <span className="text-[10px] text-[#F6851B] bg-[#F6851B]/20 px-2 py-0.5 rounded-full border border-[#F6851B]/40 font-bold">
                       Zero-Knowledge
                     </span>
                   </div>
 
                   {/* Flow Arrow */}
-                  <div className="flex items-center justify-center gap-2 text-zinc-500 text-[10px]">
-                    <div className="h-px bg-zinc-800 flex-1" />
-                    <span className="flex items-center gap-1 text-emerald-400">
-                      <Database className="h-3 w-3" /> Decentralized Pinning
+                  <div className="flex items-center justify-center gap-2 text-[#848C96] text-[10px]">
+                    <div className="h-px bg-[#2E3238] flex-1" />
+                    <span className="flex items-center gap-1 text-[#037DD6] font-semibold">
+                      <Database className="h-3 w-3" /> IPFS Decentralized Swarm
                     </span>
-                    <div className="h-px bg-zinc-800 flex-1" />
+                    <div className="h-px bg-[#2E3238] flex-1" />
                   </div>
 
                   {/* Step 3: IPFS Decentralized Swarm */}
-                  <div className="rounded-lg border border-zinc-800 bg-zinc-900/60 p-3 space-y-2">
+                  <div className="rounded-xl border border-[#3B4046] bg-[#141618] p-3 space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-zinc-400 text-[11px] flex items-center gap-1.5">
-                        <HardDriveDownload className="h-3.5 w-3.5 text-purple-400" />
-                        Decentralized Swarm Allocation
+                      <span className="text-[#848C96] text-[11px] flex items-center gap-1.5">
+                        <HardDriveDownload className="h-3.5 w-3.5 text-[#037DD6]" />
+                        Pinata Distributed Gateway
                       </span>
                       <span className="text-[10px] text-emerald-400 font-mono">100% Pinned</span>
                     </div>
-                    <div className="w-full bg-zinc-800 h-1.5 rounded-full overflow-hidden">
-                      <div className="bg-gradient-to-r from-cyan-400 to-emerald-400 h-full w-[85%] rounded-full" />
+                    <div className="w-full bg-[#24272A] h-1.5 rounded-full overflow-hidden">
+                      <div className="bg-[#F6851B] h-full w-[85%] rounded-full" />
                     </div>
-                    <div className="flex justify-between text-[10px] text-zinc-500">
+                    <div className="flex justify-between text-[10px] text-[#848C96]">
                       <span>CID: bafybeigdyrzt5...</span>
-                      <span>3 Swarm Replicas</span>
+                      <span>Encrypted Ciphertext</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Cryptographic Key Guarantee */}
-                <div className="mt-4 pt-3 border-t border-zinc-800/80 flex items-center justify-between text-[11px] text-zinc-400">
+                <div className="mt-4 pt-3 border-t border-[#2E3238] flex items-center justify-between text-[11px] text-[#848C96]">
                   <span className="flex items-center gap-1.5">
-                    <Key className="h-3.5 w-3.5 text-cyan-400" />
-                    Key derivation:
+                    <Key className="h-3.5 w-3.5 text-[#F6851B]" />
+                    Sovereign Derivation:
                   </span>
-                  <span className="font-mono text-zinc-200">EVM Wallet Signed Secret</span>
+                  <span className="font-mono text-white font-semibold">MetaMask Wallet Signed SIWE</span>
                 </div>
               </div>
             </div>

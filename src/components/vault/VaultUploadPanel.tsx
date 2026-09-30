@@ -172,21 +172,21 @@ function DropZone({
 
   if (file) {
     return (
-      <div className="relative flex items-center gap-3 rounded-xl border border-cyan-500/30 bg-cyan-950/20 p-4">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-cyan-500/10 border border-cyan-500/20">
-          <FileText className="h-5 w-5 text-cyan-400" />
+      <div className="relative flex items-center gap-3 rounded-xl border border-[#3B4046] bg-[#141618] p-4">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#F6851B]/15 border border-[#F6851B]/30">
+          <FileText className="h-5 w-5 text-[#F6851B]" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-zinc-100">{file.name}</p>
-          <p className="text-xs text-zinc-500">
-            {formatBytes(file.size)} · {file.type || "unknown type"}
+          <p className="truncate text-sm font-semibold text-[#F2F4F6]">{file.name}</p>
+          <p className="text-xs text-[#848C96]">
+            {formatBytes(file.size)} · {file.type || "binary payload"}
           </p>
         </div>
         {!disabled && (
           <button
             type="button"
             onClick={onClear}
-            className="shrink-0 rounded-md p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 transition-colors"
+            className="shrink-0 rounded-lg p-1.5 text-[#848C96] hover:bg-[#24272A] hover:text-[#F2F4F6] transition-colors"
           >
             <X className="h-4 w-4" />
           </button>
@@ -202,12 +202,12 @@ function DropZone({
       onDragLeave={() => setIsDragging(false)}
       onClick={() => !disabled && inputRef.current?.click()}
       className={cn(
-        "relative flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-8 text-center transition-all duration-200",
+        "relative flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed p-8 text-center transition-all duration-200",
         disabled
-          ? "border-zinc-800 opacity-50 cursor-not-allowed"
+          ? "border-[#2E3238] opacity-50 cursor-not-allowed"
           : isDragging
-          ? "border-cyan-400 bg-cyan-950/30 scale-[1.01] cursor-copy"
-          : "border-zinc-700 hover:border-zinc-600 hover:bg-zinc-900/50 cursor-pointer"
+          ? "border-[#F6851B] bg-[#F6851B]/10 scale-[1.01] cursor-copy"
+          : "border-[#3B4046] hover:border-[#F6851B]/60 hover:bg-[#24272A]/50 bg-[#141618]/60 cursor-pointer"
       )}
     >
       <input
@@ -219,14 +219,14 @@ function DropZone({
         aria-label="Select a file to encrypt and upload"
       />
       <div className={cn(
-        "flex h-12 w-12 items-center justify-center rounded-full border transition-all",
-        isDragging ? "border-cyan-500/60 bg-cyan-500/10" : "border-zinc-700 bg-zinc-900"
+        "flex h-12 w-12 items-center justify-center rounded-2xl border transition-all",
+        isDragging ? "border-[#F6851B]/60 bg-[#F6851B]/20" : "border-[#3B4046] bg-[#24272A]"
       )}>
-        <Upload className={cn("h-5 w-5 transition-colors", isDragging ? "text-cyan-400" : "text-zinc-500")} />
+        <Upload className={cn("h-5 w-5 transition-colors", isDragging ? "text-[#F6851B]" : "text-[#848C96]")} />
       </div>
       <div>
-        <p className="text-sm font-medium text-zinc-300">Drop any file here, or click to browse</p>
-        <p className="mt-0.5 text-xs text-zinc-500">Max 500 MB · Any type · Will be encrypted before upload</p>
+        <p className="text-sm font-semibold text-[#F2F4F6]">Drop any file here, or click to browse</p>
+        <p className="mt-0.5 text-xs text-[#848C96]">Max 500 MB · Client-side encrypted before upload to IPFS</p>
       </div>
     </div>
   );
@@ -240,7 +240,7 @@ function VaultXKeyBadge({ vaultId, keyHex }: { vaultId: string; keyHex: string }
   const [showFallback, setShowFallback] = useState(false);
 
   return (
-    <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/10 p-4 space-y-3">
+    <div className="rounded-2xl border border-emerald-500/30 bg-emerald-950/10 p-4 space-y-3">
       <div className="flex items-center gap-2">
         <ShieldCheck className="h-4 w-4 text-emerald-400" />
         <span className="text-xs font-semibold text-emerald-300 uppercase tracking-wider">
@@ -248,42 +248,42 @@ function VaultXKeyBadge({ vaultId, keyHex }: { vaultId: string; keyHex: string }
         </span>
       </div>
 
-      <div className="flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-950/20 px-3 py-2">
+      <div className="flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-[#141618] px-3 py-2">
         <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
         <span className="font-mono text-xs text-emerald-300">{vaultId}</span>
-        <span className="ml-auto text-[10px] text-emerald-600 uppercase tracking-wider">Active KEK</span>
+        <span className="ml-auto text-[10px] text-emerald-500 uppercase tracking-wider">Active KEK</span>
       </div>
 
-      <p className="text-[11px] text-zinc-500 leading-relaxed">
+      <p className="text-[11px] text-[#848C96] leading-relaxed">
         Your file-encryption key has been wrapped by your VaultX master key and saved locally.{" "}
-        <strong className="text-zinc-400">No manual key copy needed</strong> — VaultX will unlock it
+        <strong className="text-[#F2F4F6]">No manual key copy needed</strong> — VaultX will unlock it
         automatically when you retrieve this file.
       </p>
 
       <button
         type="button"
         onClick={() => setShowFallback((v) => !v)}
-        className="inline-flex items-center gap-1 text-[10px] text-zinc-600 hover:text-zinc-400 underline transition-colors"
+        className="inline-flex items-center gap-1 text-[11px] text-[#848C96] hover:text-[#F2F4F6] underline transition-colors"
       >
         {showFallback ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
         {showFallback ? "Hide" : "Show"} raw backup key
       </button>
 
       {showFallback && (
-        <div className="rounded-lg border border-amber-500/30 bg-amber-950/20 p-3 space-y-2">
+        <div className="rounded-xl border border-[#3B4046] bg-[#141618] p-3 space-y-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
-              <Key className="h-3.5 w-3.5 text-amber-400" />
-              <span className="text-[10px] font-semibold text-amber-300 uppercase tracking-wider">
+              <Key className="h-3.5 w-3.5 text-[#F6851B]" />
+              <span className="text-[10px] font-bold text-[#F6851B] uppercase tracking-wider">
                 Raw AES-256 Backup Key
               </span>
             </div>
             <CopyButton text={keyHex} label="Copy Key" />
           </div>
-          <p className="break-all font-mono text-[10px] text-amber-200 leading-relaxed bg-amber-950/30 rounded-lg border border-amber-500/20 p-2">
+          <p className="break-all font-mono text-[10px] text-[#F6851B] leading-relaxed bg-[#24272A] rounded-xl border border-[#3B4046] p-2">
             {keyHex}
           </p>
-          <div className="flex items-start gap-2 rounded-lg border border-red-500/20 bg-red-950/20 px-3 py-2">
+          <div className="flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-950/20 px-3 py-2">
             <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-red-400" />
             <p className="text-[10px] text-red-300 leading-relaxed">
               Store this only if you plan to access this file without VaultX on a different device.
@@ -304,11 +304,11 @@ function KeySaveBox({ keyHex }: { keyHex: string }) {
   const display = visible ? keyHex : keyHex.slice(0, 8) + "•".repeat(48) + keyHex.slice(-8);
 
   return (
-    <div className="rounded-xl border border-amber-500/30 bg-amber-950/20 p-4 space-y-3">
+    <div className="rounded-2xl border border-[#3B4046] bg-[#141618] p-4 space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
-          <Key className="h-4 w-4 text-amber-400" />
-          <span className="text-xs font-semibold text-amber-300 uppercase tracking-wider">
+          <Key className="h-4 w-4 text-[#F6851B]" />
+          <span className="text-xs font-bold text-[#F6851B] uppercase tracking-wider">
             AES-256 Encryption Key — Save Now
           </span>
         </div>
@@ -316,7 +316,7 @@ function KeySaveBox({ keyHex }: { keyHex: string }) {
           <button
             type="button"
             onClick={() => setVisible((v) => !v)}
-            className="inline-flex items-center gap-1 rounded px-2 py-1 text-[10px] font-mono text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
+            className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-mono text-[#848C96] hover:text-[#F2F4F6] hover:bg-[#24272A] transition-colors"
           >
             {visible ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
             {visible ? "Hide" : "Reveal"}
@@ -325,18 +325,15 @@ function KeySaveBox({ keyHex }: { keyHex: string }) {
         </div>
       </div>
 
-      <p className="break-all font-mono text-xs text-amber-200 leading-relaxed bg-amber-950/30 rounded-lg border border-amber-500/20 p-2.5">
+      <p className="break-all font-mono text-xs text-[#F6851B] leading-relaxed bg-[#24272A] rounded-xl border border-[#3B4046] p-2.5">
         {display}
       </p>
 
-      <div className="flex items-start gap-2 rounded-lg border border-red-500/20 bg-red-950/20 px-3 py-2">
+      <div className="flex items-start gap-2 rounded-xl border border-red-500/30 bg-red-950/20 px-3.5 py-2.5">
         <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-400" />
         <p className="text-[11px] text-red-300 leading-relaxed">
-          <strong>This key is shown exactly once.</strong> CYBER-10 does not store it.
-          Without this key, your file cannot be decrypted — not even from IPFS.{" "}
-          <span className="text-amber-300 font-medium">
-            Connect VaultX Secure Wallet to manage keys automatically.
-          </span>
+          <strong>This key is shown exactly once.</strong> The server does not store it.
+          Without this key, your file cannot be decrypted from IPFS.
         </p>
       </div>
     </div>
@@ -351,37 +348,37 @@ function CidDisplay({ cid, uploadedAt, size }: { cid: string; uploadedAt: string
   const ipfsUrl = getIpfsUrl(cid);
 
   return (
-    <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/10 p-4 space-y-4">
+    <div className="rounded-2xl border border-[#3B4046] bg-[#24272A] p-5 space-y-4 shadow-lg">
       {/* Success header */}
       <div className="flex items-center gap-2">
         <CheckCircle2 className="h-5 w-5 text-emerald-400" />
-        <span className="font-semibold text-emerald-300">Uploaded to IPFS</span>
+        <span className="font-bold text-white">Uploaded to IPFS</span>
       </div>
 
       {/* CID */}
       <div>
         <div className="flex items-center justify-between mb-1.5">
-          <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">
+          <span className="text-[10px] font-mono uppercase tracking-wider text-[#848C96]">
             IPFS Content Identifier (CID)
           </span>
           <CopyButton text={cid} label="Copy CID" />
         </div>
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2.5">
-          <p className="break-all font-mono text-xs text-cyan-300 leading-relaxed">{cid}</p>
+        <div className="rounded-xl border border-[#3B4046] bg-[#141618] px-3.5 py-2.5">
+          <p className="break-all font-mono text-xs text-[#037DD6] leading-relaxed font-semibold">{cid}</p>
         </div>
       </div>
 
       {/* Metadata */}
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-2.5">
         {[
           { label: "Encrypted Size", value: formatBytes(size) },
           { label: "Uploaded At", value: new Date(uploadedAt).toLocaleString() },
           { label: "Storage", value: "IPFS via Pinata" },
           { label: "Content", value: "AES-256-GCM Ciphertext" },
         ].map(({ label, value }) => (
-          <div key={label} className="rounded-lg border border-zinc-800 bg-zinc-900/50 px-3 py-2">
-            <p className="text-[10px] uppercase tracking-wider text-zinc-500">{label}</p>
-            <p className="mt-0.5 text-xs text-zinc-200 font-mono">{value}</p>
+          <div key={label} className="rounded-xl border border-[#3B4046] bg-[#141618] px-3.5 py-2">
+            <p className="text-[10px] uppercase tracking-wider text-[#848C96]">{label}</p>
+            <p className="mt-0.5 text-xs text-[#F2F4F6] font-mono font-medium">{value}</p>
           </div>
         ))}
       </div>
@@ -391,19 +388,19 @@ function CidDisplay({ cid, uploadedAt, size }: { cid: string; uploadedAt: string
         href={ipfsUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center justify-center gap-2 rounded-xl border border-zinc-700 bg-zinc-900 py-2.5 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors"
+        className="flex items-center justify-center gap-2 rounded-xl border border-[#3B4046] bg-[#141618] py-2.5 text-xs text-[#848C96] hover:bg-[#2B2F34] hover:text-[#F2F4F6] transition-colors"
       >
-        <Globe className="h-3.5 w-3.5" />
+        <Globe className="h-3.5 w-3.5 text-[#037DD6]" />
         View on IPFS Gateway
         <ExternalLink className="h-3 w-3" />
       </a>
 
       {/* Security note */}
-      <div className="flex items-start gap-2 rounded-lg border border-zinc-800 bg-zinc-900/40 px-3 py-2">
-        <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-zinc-500" />
-        <p className="text-[11px] text-zinc-500 leading-relaxed">
+      <div className="flex items-start gap-2 rounded-xl border border-[#3B4046] bg-[#141618] px-3 py-2">
+        <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#037DD6]" />
+        <p className="text-[11px] text-[#848C96] leading-relaxed">
           The content on IPFS is pure ciphertext. It cannot be read without your AES-256 key.
-          Use the <strong className="text-zinc-400">Retrieve tab</strong> to download and decrypt.
+          Use the <strong className="text-white">Retrieve tab</strong> to download and decrypt.
         </p>
       </div>
     </div>
@@ -643,10 +640,10 @@ export function VaultUploadPanel() {
 
       {/* Info banner */}
       {stage === "idle" && (
-        <div className="flex items-start gap-2.5 rounded-xl border border-cyan-500/20 bg-cyan-950/20 px-4 py-3">
-          <Info className="mt-0.5 h-4 w-4 shrink-0 text-cyan-400" />
-          <div className="text-xs text-zinc-400 leading-relaxed">
-            <span className="text-cyan-300 font-medium">Zero-knowledge upload.</span>{" "}
+        <div className="flex items-start gap-2.5 rounded-xl border border-[#037DD6]/30 bg-[#141618] px-4 py-3">
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-[#037DD6]" />
+          <div className="text-xs text-[#848C96] leading-relaxed">
+            <span className="text-[#037DD6] font-semibold">Zero-knowledge upload.</span>{" "}
             Files are encrypted in your browser with AES-256-GCM before upload.
             Only ciphertext reaches the server — your plaintext and key never leave your device.
             {isVaultXActive && (
@@ -669,20 +666,20 @@ export function VaultUploadPanel() {
       {/* Crypto progress */}
       {cryptoProgress && stage === "encrypting" && (
         <div className="space-y-2">
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
-            <div className="h-full w-1/3 rounded-full bg-gradient-to-r from-violet-500 to-cyan-500 animate-[shimmer_1.2s_ease-in-out_infinite]" />
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#141618]">
+            <div className="h-full w-1/3 rounded-full bg-[#F6851B] animate-[shimmer_1.2s_ease-in-out_infinite]" />
           </div>
-          <p className="text-xs text-zinc-400 font-mono">{cryptoProgress.message}</p>
+          <p className="text-xs text-[#848C96] font-mono">{cryptoProgress.message}</p>
         </div>
       )}
 
       {/* Upload spinner */}
       {stage === "uploading" && (
         <div className="space-y-2">
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
-            <div className="h-full w-1/3 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 animate-[shimmer_1.2s_ease-in-out_infinite]" />
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#141618]">
+            <div className="h-full w-1/3 rounded-full bg-[#F6851B] animate-[shimmer_1.2s_ease-in-out_infinite]" />
           </div>
-          <p className="text-xs text-zinc-400 font-mono">
+          <p className="text-xs text-[#848C96] font-mono">
             Uploading {formatBytes(encryptedSize)} encrypted bundle to Pinata IPFS...
           </p>
         </div>
@@ -704,7 +701,7 @@ export function VaultUploadPanel() {
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
             <p className="text-sm text-red-300">{errorMessage}</p>
           </div>
-          <button type="button" onClick={reset} className="text-xs text-zinc-500 hover:text-zinc-300 underline transition-colors">
+          <button type="button" onClick={reset} className="text-xs text-[#848C96] hover:text-[#F2F4F6] underline transition-colors">
             Start over
           </button>
         </div>
@@ -722,7 +719,7 @@ export function VaultUploadPanel() {
           id="vault-encrypt-upload-btn"
           onClick={handleEncryptAndUpload}
           disabled={isProcessing}
-          className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold transition-all duration-200 bg-gradient-to-r from-cyan-500 via-violet-500 to-fuchsia-500 text-white hover:brightness-110 shadow-lg shadow-violet-500/20 active:scale-[0.98]"
+          className="w-full flex items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold transition-all duration-200 bg-[#F6851B] hover:bg-[#E2761B] text-white shadow-md active:scale-[0.98]"
         >
           <Lock className="h-4 w-4" />
           Encrypt & Upload to IPFS
@@ -734,9 +731,9 @@ export function VaultUploadPanel() {
         <button
           type="button"
           onClick={reset}
-          className="w-full flex items-center justify-center gap-2 rounded-xl border border-zinc-700 bg-zinc-900 py-2.5 text-sm text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors"
+          className="w-full flex items-center justify-center gap-2 rounded-xl border border-[#3B4046] bg-[#141618] py-2.5 text-xs font-semibold text-[#848C96] hover:bg-[#2B2F34] hover:text-[#F2F4F6] transition-colors"
         >
-          <RefreshCw className="h-4 w-4" />
+          <RefreshCw className="h-3.5 w-3.5" />
           Upload Another File
         </button>
       )}

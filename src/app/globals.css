@@ -1,8 +1,15 @@
 @import "tailwindcss";
 
 :root {
-  --background: #09090b;
-  --foreground: #fafafa;
+  --background: #141618;
+  --foreground: #f2f4f6;
+  --mm-orange: #f6851b;
+  --mm-orange-hover: #e2761b;
+  --mm-blue: #037dd6;
+  --mm-blue-hover: #038ff0;
+  --mm-surface: #1e2024;
+  --mm-card: #24272a;
+  --mm-border: #3b4046;
 }
 
 @theme inline {
@@ -18,28 +25,34 @@ html {
 }
 
 body {
-  background-color: #09090b;
-  color: #fafafa;
+  background-color: #141618;
+  color: #f2f4f6;
   overflow-x: hidden;
 }
 
-/* Subtle modern scrollbar */
+/* MetaMask Fox Orange Text Selection */
+::selection {
+  background-color: #f6851b;
+  color: #141618;
+}
+
+/* MetaMask Subtle Charcoal Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #09090b;
+  background: #141618;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #27272a;
+  background: #2b2f34;
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #3f3f46;
+  background: #3b4046;
 }
 
 /* Shimmer animation for indeterminate progress bars */

@@ -77,50 +77,53 @@ function SignInContent() {
 
   if (isCheckingSession) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-[#141618]">
         <div className="flex flex-col items-center gap-3">
-          <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl border border-cyan-500/30 bg-zinc-900">
-            <ShieldCheck className="h-7 w-7 text-cyan-400 animate-pulse" />
+          <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl border border-[#F6851B]/40 bg-[#1E2024] text-2xl">
+            🦊
           </div>
-          <p className="text-sm font-mono text-zinc-400">Checking session…</p>
+          <p className="text-sm font-mono text-[#848C96]">Checking sovereign session…</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-4 py-12">
-      {/* Background ambient */}
+    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-4 py-12 bg-[#141618]">
+      {/* Background ambient Fox glow */}
       <div className="pointer-events-none absolute inset-0 -z-10">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[400px] bg-gradient-to-b from-cyan-500/8 via-violet-500/5 to-transparent blur-3xl" />
-        <div className="absolute inset-0 bg-[radial-gradient(#27272a_1px,transparent_1px)] [background-size:24px_24px] opacity-25" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[400px] bg-gradient-to-b from-[#F6851B]/10 via-[#037DD6]/5 to-transparent blur-3xl" />
+        <div className="absolute inset-0 bg-[radial-gradient(#2E3238_1px,transparent_1px)] [background-size:24px_24px] opacity-40" />
       </div>
 
       <div className="w-full max-w-md">
         {/* Back link */}
         <Link
           href="/"
-          className="mb-8 inline-flex items-center gap-1.5 text-xs font-mono text-zinc-500 hover:text-zinc-300 transition-colors"
+          className="mb-8 inline-flex items-center gap-1.5 text-xs font-mono text-[#848C96] hover:text-[#F2F4F6] transition-colors"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
-          Back to Home
+          Back to Vault
         </Link>
 
         {/* Card */}
-        <div className="relative rounded-2xl border border-zinc-800 bg-zinc-950/90 p-8 shadow-2xl shadow-cyan-950/20 backdrop-blur-xl">
+        <div className="relative rounded-2xl border border-[#3B4046] bg-[#1E2024] p-8 shadow-2xl shadow-black/80 backdrop-blur-xl">
           {/* Decorative corner glow */}
-          <div className="pointer-events-none absolute top-0 right-0 -mt-6 -mr-6 h-32 w-32 rounded-full bg-cyan-500/10 blur-2xl" />
+          <div className="pointer-events-none absolute top-0 right-0 -mt-6 -mr-6 h-32 w-32 rounded-full bg-[#F6851B]/10 blur-2xl" />
 
           {/* Header */}
           <div className="mb-8 text-center">
-            <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-2xl border border-cyan-500/40 bg-gradient-to-br from-cyan-950/60 to-violet-950/60 shadow-lg shadow-cyan-500/10">
-              <ShieldCheck className="h-8 w-8 text-cyan-400" />
+            <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-2xl border border-[#F6851B]/40 bg-[#24272A] shadow-lg shadow-[#F6851B]/10 text-3xl">
+              🦊
             </div>
-            <h1 className="text-2xl font-extrabold tracking-tight text-zinc-100">
-              Sign in to CYBER-10
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#F6851B]/15 border border-[#F6851B]/30 text-[#F6851B] text-[10px] font-bold uppercase tracking-wider mb-2">
+              MetaMask Sovereign Security
+            </div>
+            <h1 className="text-2xl font-black tracking-tight text-white">
+              VaultX Sovereign Sign In
             </h1>
-            <p className="mt-2 text-sm text-zinc-400">
-              Access your decentralized encrypted file vault
+            <p className="mt-1.5 text-xs text-[#848C96]">
+              Dual-layer decentralized sovereign encryption vault
             </p>
           </div>
 
@@ -137,11 +140,11 @@ function SignInContent() {
             onClick={handleGoogleSignIn}
             disabled={isLoading}
             id="google-signin-btn"
-            className="group relative w-full flex items-center justify-center gap-3 rounded-xl border border-zinc-700 bg-zinc-900 px-6 py-4 text-sm font-semibold text-zinc-100 shadow-lg transition-all duration-200 hover:border-zinc-600 hover:bg-zinc-800 hover:shadow-zinc-800/40 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
+            className="group relative w-full flex items-center justify-center gap-3 rounded-xl border border-[#3B4046] bg-[#24272A] px-6 py-3.5 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:border-[#848C96] hover:bg-[#2B2F34] active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {isLoading ? (
               <>
-                <Loader2 className="h-5 w-5 animate-spin text-zinc-400" />
+                <Loader2 className="h-5 w-5 animate-spin text-[#848C96]" />
                 <span>Connecting to Google…</span>
               </>
             ) : (
@@ -171,33 +174,33 @@ function SignInContent() {
           </button>
 
           {/* Divider */}
-          <div className="my-6 flex items-center gap-3">
-            <div className="h-px flex-1 bg-zinc-800" />
-            <span className="text-xs font-mono text-zinc-600">or use Web3</span>
-            <div className="h-px flex-1 bg-zinc-800" />
+          <div className="my-5 flex items-center gap-3">
+            <div className="h-px flex-1 bg-[#2E3238]" />
+            <span className="text-[11px] font-mono text-[#848C96]">or sovereign Web3</span>
+            <div className="h-px flex-1 bg-[#2E3238]" />
           </div>
 
           {/* MetaMask / VaultX Wallet option */}
           <Link
             href="/"
-            className="flex items-center justify-center gap-2.5 rounded-xl border border-zinc-800 bg-zinc-900/50 px-6 py-3.5 text-sm font-medium text-zinc-300 transition-all hover:border-zinc-700 hover:bg-zinc-800/60 hover:text-zinc-100"
+            className="flex items-center justify-center gap-2.5 rounded-xl bg-[#F6851B] hover:bg-[#E2761B] px-6 py-3.5 text-sm font-bold text-white shadow-md transition-all active:scale-[0.98]"
           >
             <span className="text-lg">🦊</span>
-            <span>Connect MetaMask / VaultX Wallet</span>
+            <span>Connect with MetaMask</span>
           </Link>
 
           {/* Security features */}
-          <div className="mt-8 space-y-2.5 rounded-xl border border-zinc-800/60 bg-zinc-900/30 p-4">
-            <p className="mb-3 text-[10px] font-mono uppercase tracking-wider text-zinc-600">
-              Security Guarantees
+          <div className="mt-8 space-y-2.5 rounded-xl border border-[#2E3238] bg-[#141618] p-4">
+            <p className="mb-3 text-[10px] font-mono uppercase tracking-wider text-[#848C96]">
+              MetaMask Sovereign Security Guarantees
             </p>
             {[
-              { icon: Lock, color: "text-cyan-400", text: "Zero-knowledge client-side file encryption" },
-              { icon: ShieldCheck, color: "text-emerald-400", text: "Files encrypted before upload — not accessible by Google" },
-              { icon: Zap, color: "text-amber-400", text: "Google identity used for auth only — no key access" },
-              { icon: Globe, color: "text-violet-400", text: "IPFS decentralized storage — files survive deplatforming" },
+              { icon: Lock, color: "text-[#F6851B]", text: "Zero-knowledge client-side AES-256-GCM encryption" },
+              { icon: ShieldCheck, color: "text-emerald-400", text: "Files encrypted before upload — Google cannot access contents" },
+              { icon: Zap, color: "text-[#F6851B]", text: "SIWE challenge ensures cryptographically verified identity" },
+              { icon: Globe, color: "text-[#037DD6]", text: "IPFS decentralized pinning — resilient censorship-resistant storage" },
             ].map(({ icon: Icon, color, text }) => (
-              <div key={text} className="flex items-center gap-2.5 text-xs text-zinc-400">
+              <div key={text} className="flex items-center gap-2.5 text-xs text-[#848C96]">
                 <Icon className={`h-3.5 w-3.5 shrink-0 ${color}`} />
                 <span>{text}</span>
               </div>
@@ -206,8 +209,8 @@ function SignInContent() {
         </div>
 
         {/* Footer note */}
-        <p className="mt-6 text-center text-[11px] font-mono text-zinc-600">
-          By signing in you agree to CYBER-10 Terms · Your encryption keys are never shared
+        <p className="mt-6 text-center text-[11px] font-mono text-[#848C96]">
+          VaultX Sovereign Vault · MetaMask Portfolio Design Standard
         </p>
       </div>
     </div>

@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { Copy, Check, LogOut, ShieldCheck } from "lucide-react";
+import { Copy, Check, LogOut, ShieldCheck, Lock, UploadCloud, DownloadCloud, Key, ExternalLink } from "lucide-react";
+import Link from "next/link";
 import { useAuthStatus } from "@/hooks/useAuthStatus";
 import { useVaultXWallet } from "@/context/VaultXWalletContext";
 import { useGoogleAuth } from "@/hooks/useGoogleAuth";
@@ -36,69 +37,132 @@ export function DashboardHeader() {
   };
 
   return (
-    <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-6 md:p-8 backdrop-blur-xl mb-8 relative overflow-hidden">
-      {/* Decorative gradient overlay */}
-      <div className="absolute top-0 right-0 -mt-12 -mr-12 w-96 h-96 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none" />
+    <div className="rounded-2xl border border-[#3b4046] bg-[#1e2024] p-6 md:p-8 backdrop-blur-xl mb-8 relative overflow-hidden shadow-xl shadow-black/40">
+      {/* Decorative subtle MetaMask Fox Orange ambient glow */}
+      <div className="absolute top-0 right-0 -mt-16 -mr-16 w-80 h-80 bg-[#f6851b]/10 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
-        {/* Left: Title and Verified Session Details */}
-        <div className="space-y-3">
-          <div className="security-pills flex items-center gap-2 flex-wrap">
-            {isGoogleAuthenticated && (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-500/30 bg-blue-950/40 px-2.5 py-0.5 text-xs font-mono text-blue-300">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
-                </span>
-                <span>Google Authenticated</span>
-              </span>
-            )}
-
-            {address && (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-950/40 px-2.5 py-0.5 text-xs font-mono text-emerald-300">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                </span>
-                <span>MetaMask Verified (SIWE / EIP-4361)</span>
-              </span>
-            )}
-
-            <span className="inline-flex items-center gap-1 rounded-full border border-cyan-500/30 bg-cyan-950/40 px-2.5 py-0.5 text-xs font-mono text-cyan-300">
-              <ShieldCheck className="h-3 w-3 text-cyan-400" />
-              <span>HttpOnly Session Guard</span>
-            </span>
+      {/* Top Bar: Network Pill & Status Badges */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-6 border-b border-[#2e3238] relative z-10">
+        <div className="flex items-center gap-2.5">
+          {/* MetaMask Fox Identicon Badge */}
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-[#f6851b] to-[#cd6116] text-xl shadow-md shadow-[#f6851b]/20 border border-[#f6851b]/40">
+            🦊
           </div>
-
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-zinc-100">
-            Welcome to CYBER-10
-          </h1>
-
-          <p className="text-sm text-zinc-400 max-w-xl">
-            Decentralized sovereign vault for your confidential files.
-            Authenticated via Google Identity + Non-custodial MetaMask Cryptographic Signature.
-          </p>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-[#f2f4f6] text-sm">
+                {googleUser?.name ? `${googleUser.name}'s Vault` : "MetaMask Portfolio Vault"}
+              </span>
+              <span className="rounded-full bg-[#f6851b]/15 border border-[#f6851b]/30 px-2 py-0.5 text-[9px] font-mono text-[#f6851b] font-semibold">
+                ACTIVE
+              </span>
+            </div>
+            {address && (
+              <div className="flex items-center gap-1.5 text-xs text-[#848c96] font-mono mt-0.5">
+                <span>{formatAddress(address, 6)}</span>
+                <button
+                  onClick={handleCopy}
+                  type="button"
+                  title="Copy wallet address"
+                  className="hover:text-[#f2f4f6] transition-colors"
+                >
+                  {copied ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Right: Connected Identity */}
-        <div className="identity-card flex flex-col gap-2.5 bg-zinc-950/80 border border-zinc-800 p-4 rounded-xl font-mono text-xs w-full lg:w-auto">
-          <div className="flex items-center justify-between gap-4 border-b border-zinc-800/80 pb-2">
-            <span className="text-[10px] uppercase text-zinc-500 font-semibold tracking-wider">
+        {/* Network & Verification Badges */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-[#3b4046] bg-[#24272a] px-3 py-1 text-xs font-medium text-[#f2f4f6]">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            <span>{chainName || "Ethereum / Sepolia"}</span>
+          </div>
+
+          {isGoogleAuthenticated && (
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-blue-500/30 bg-blue-950/40 px-3 py-1 text-xs font-mono text-blue-300">
+              <span>Google Verified</span>
+            </div>
+          )}
+
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-[#f6851b]/30 bg-[#f6851b]/10 px-3 py-1 text-xs font-mono text-[#f6851b]">
+            <ShieldCheck className="h-3.5 w-3.5" />
+            <span>EIP-4361 SIWE</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="pt-6 flex flex-col lg:flex-row lg:items-center justify-between gap-8 relative z-10">
+        {/* Left: Vault Title & Quick Actions */}
+        <div className="space-y-4">
+          <div>
+            <span className="text-[11px] font-mono uppercase tracking-widest text-[#848c96] font-semibold">
+              MetaMask Sovereign Vault
+            </span>
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#f2f4f6] mt-1">
+              Zero-Knowledge Encrypted Storage
+            </h1>
+            <p className="text-sm text-[#848c96] max-w-xl mt-1.5 leading-relaxed">
+              Files are encrypted locally in your browser using non-extractable AES-256 keys and pinned to decentralized IPFS. Plaintext never leaves your machine.
+            </p>
+          </div>
+
+          {/* MetaMask Portfolio Signature Action Buttons */}
+          <div className="pt-2 flex items-center gap-3 sm:gap-4 flex-wrap">
+            {/* Action 1: Encrypt (Primary Fox Orange Button) */}
+            <Link
+              href="/dashboard/encrypt"
+              className="inline-flex items-center gap-2 rounded-xl bg-[#f6851b] hover:bg-[#e2761b] active:bg-[#cd6116] text-[#141618] px-4 py-2.5 font-bold text-xs shadow-md shadow-[#f6851b]/20 transition-all active:scale-[0.98]"
+            >
+              <Lock className="h-4 w-4" />
+              <span>Encrypt File</span>
+            </Link>
+
+            {/* Action 2: Store on IPFS */}
+            <Link
+              href="/dashboard/vault"
+              className="inline-flex items-center gap-2 rounded-xl border border-[#3b4046] bg-[#24272a] hover:bg-[#2b2f34] text-[#f2f4f6] px-4 py-2.5 font-semibold text-xs transition-all active:scale-[0.98]"
+            >
+              <UploadCloud className="h-4 w-4 text-[#f6851b]" />
+              <span>IPFS Vault</span>
+            </Link>
+
+            {/* Action 3: Key Wallet */}
+            <button
+              onClick={openVaultXModal}
+              type="button"
+              className="inline-flex items-center gap-2 rounded-xl border border-[#3b4046] bg-[#24272a] hover:bg-[#2b2f34] text-[#f2f4f6] px-4 py-2.5 font-semibold text-xs transition-all active:scale-[0.98]"
+            >
+              <Key className="h-4 w-4 text-[#037dd6]" />
+              <span>Manage Keys</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Right: Dual Identity Card Panel */}
+        <div className="identity-card flex flex-col gap-2.5 bg-[#141618] border border-[#2e3238] p-4 rounded-2xl font-mono text-xs w-full lg:w-auto min-w-[280px] shadow-lg">
+          <div className="flex items-center justify-between gap-4 border-b border-[#2e3238] pb-2">
+            <span className="text-[10px] uppercase text-[#848c96] font-semibold tracking-wider">
               Connected Dual Identity
             </span>
             <span className="text-[10px] text-emerald-400 font-sans">Active Session</span>
           </div>
 
-          <div className="grid grid-cols-1 gap-2.5">
-            {/* Google User Identity */}
+          <div className="grid grid-cols-1 gap-2">
+            {/* Google Identity */}
             {isGoogleAuthenticated && googleUser && (
-              <div className="flex items-center gap-2.5 bg-zinc-900/60 p-2.5 rounded-lg border border-blue-900/30 min-w-[240px]">
+              <div className="flex items-center gap-2.5 bg-[#1e2024] p-2.5 rounded-xl border border-blue-900/30">
                 {googleUser.image ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={googleUser.image}
-                    alt={googleUser.name ?? "Google user"}
-                    className="h-8 w-8 rounded-full border border-zinc-700 shrink-0"
+                    alt={googleUser.name ?? "Google"}
+                    className="h-8 w-8 rounded-full border border-[#3b4046] shrink-0"
                     referrerPolicy="no-referrer"
                   />
                 ) : (
@@ -107,17 +171,15 @@ export function DashboardHeader() {
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between text-[10px] text-zinc-400">
+                  <div className="flex items-center justify-between text-[10px] text-[#848c96]">
                     <span>Google Account</span>
                     <span className="text-emerald-400 font-sans">● Verified</span>
                   </div>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="font-semibold text-zinc-200 truncate text-[11px]">
-                      {googleUser.name ?? googleUser.email}
-                    </span>
-                  </div>
+                  <span className="font-semibold text-[#f2f4f6] truncate text-[11px] block mt-0.5">
+                    {googleUser.name ?? googleUser.email}
+                  </span>
                   {googleUser.email && (
-                    <p className="text-[10px] text-zinc-500 truncate">{googleUser.email}</p>
+                    <p className="text-[10px] text-[#848c96] truncate">{googleUser.email}</p>
                   )}
                 </div>
               </div>
@@ -125,47 +187,25 @@ export function DashboardHeader() {
 
             {/* MetaMask Identity */}
             {address && (
-              <div className="flex items-center gap-2.5 bg-zinc-900/60 p-2.5 rounded-lg border border-amber-900/30 min-w-[240px]">
+              <div className="flex items-center gap-2.5 bg-[#1e2024] p-2.5 rounded-xl border border-[#f6851b]/30">
                 <span className="text-xl">🦊</span>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between text-[10px] text-zinc-400">
-                    <span>MetaMask Web3 Wallet</span>
+                  <div className="flex items-center justify-between text-[10px] text-[#848c96]">
+                    <span>MetaMask Web3</span>
                     <span className="text-emerald-400 font-sans">● Connected</span>
                   </div>
                   <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="font-semibold text-zinc-200 truncate">
+                    <span className="font-semibold text-[#f6851b] truncate font-mono text-[11px]">
                       {formatAddress(address, 6)}
                     </span>
                     <button
                       onClick={handleCopy}
                       type="button"
-                      title="Copy full address"
-                      className="p-0.5 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200"
+                      title="Copy address"
+                      className="p-0.5 rounded hover:bg-[#24272a] text-[#848c96] hover:text-[#f2f4f6]"
                     >
-                      {copied ? (
-                        <Check className="h-3 w-3 text-emerald-400" />
-                      ) : (
-                        <Copy className="h-3 w-3" />
-                      )}
+                      {copied ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
                     </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* VaultX Secure Wallet Identity (if active) */}
-            {isVaultXConnected && identity && (
-              <div className="flex items-center gap-2.5 bg-zinc-900/60 p-2.5 rounded-lg border border-cyan-900/30 min-w-[240px]">
-                <span className="text-xl">🔐</span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between text-[10px] text-zinc-400">
-                    <span>VaultX Secure Wallet</span>
-                    <span className="text-cyan-400 font-sans">● Protected</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="font-semibold text-cyan-300 truncate">
-                      {identity.id}
-                    </span>
                   </div>
                 </div>
               </div>
@@ -173,31 +213,18 @@ export function DashboardHeader() {
           </div>
 
           {/* Action Row */}
-          <div className="dashboard-header-actions flex items-center justify-between pt-1 text-[11px] font-sans">
-            <div className="flex items-center gap-2 text-zinc-400 font-mono text-[10px]">
-              <span>Network:</span>
-              <span className="text-cyan-400 font-medium">{chainName || "EVM"}</span>
-            </div>
+          <div className="flex items-center justify-between pt-2 border-t border-[#2e3238]">
+            <span className="text-[10px] text-[#848c96]">Session Active</span>
             <div className="flex items-center gap-2">
               <Button
                 onClick={handleLogout}
                 variant="outline"
                 size="sm"
                 disabled={isLoggingOut}
-                className="h-7 text-xs text-amber-400 border-amber-500/30 hover:bg-amber-950/30 px-2.5"
-                title="Invalidate SIWE session"
+                className="h-7 text-xs text-[#f6851b] border-[#f6851b]/30 hover:bg-[#f6851b]/15 px-2.5 rounded-lg"
               >
                 <LogOut className="h-3 w-3 mr-1" />
                 <span>{isLoggingOut ? "..." : "Log Out"}</span>
-              </Button>
-              <Button
-                onClick={() => disconnect()}
-                variant="ghost"
-                size="sm"
-                className="h-7 text-xs text-zinc-500 hover:text-rose-400 px-2"
-                title="Disconnect EVM wallet"
-              >
-                <span>Disconnect</span>
               </Button>
             </div>
           </div>
