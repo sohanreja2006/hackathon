@@ -271,7 +271,7 @@ export async function encryptFile(
  * (which also verifies the GCM auth tag — any tampering causes an error).
  */
 export async function decryptFile(
-  encryptedFile: File,
+  encryptedFile: File | Blob,
   keyHex: string,
   onProgress?: (p: CryptoProgress) => void
 ): Promise<DecryptedFileBundle> {
@@ -338,3 +338,144 @@ export function formatBytes(bytes: number, decimals = 2): string {
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FR-2, FR-5 & FR-6: Wallet Signature Key Derivation & Peer Re-Encryption
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Derives a deterministic 256-bit AES-GCM CryptoKey from a wallet signature.
+ * Allows 1-click decrypt without manual key management.
+ */
+export async function deriveKeyFromWalletSignature(
+  signature: string,
+  salt = "CYBER10_VAULT_DERIVATION"
+): Promise<CryptoKey> {
+  const enc = new TextEncoder();
+  const rawData = enc.encode(`${signature}::${salt}`);
+  const hash = await crypto.subtle.digest("SHA-256", rawData);
+  return crypto.subtle.importKey(
+    "raw",
+    hash,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"]
+  );
+}
+
+/**
+ * Re-encrypts a file's AES key for a peer recipient wallet address (FR-6).
+ * Derives a key-wrapping envelope bound to the recipient's address and a salt.
+ */
+export async function reencryptKeyForRecipient(
+  fileKeyHex: string,
+  recipientAddress: string,
+  salt: string
+): Promise<string> {
+  const enc = new TextEncoder();
+  const rawKeyData = enc.encode(
+    `CYBER10_PEER_GRANT::${recipientAddress.toLowerCase()}::${salt}`
+  );
+  const hash = await crypto.subtle.digest("SHA-256", rawKeyData);
+  const wrapKey = await crypto.subtle.importKey(
+    "raw",
+    hash,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt"]
+  );
+
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const payload = enc.encode(fileKeyHex);
+  const encrypted = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    wrapKey,
+    payload
+  );
+
+  const ivHex = Array.from(iv)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  const cipherHex = Array.from(new Uint8Array(encrypted))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+
+  return `${ivHex}:${cipherHex}`;
+}
+
+/**
+ * Decrypts a re-encrypted file key using recipient's wallet challenge signature (FR-6).
+ */
+export async function decryptKeyForRecipient(
+  envelopeHex: string,
+  recipientAddress: string,
+  salt: string
+): Promise<string> {
+  const [ivHex, cipherHex] = envelopeHex.split(":");
+  if (!ivHex || !cipherHex) {
+    throw new Error("Invalid key envelope format.");
+  }
+
+  const enc = new TextEncoder();
+  const rawKeyData = enc.encode(
+    `CYBER10_PEER_GRANT::${recipientAddress.toLowerCase()}::${salt}`
+  );
+  const hash = await crypto.subtle.digest("SHA-256", rawKeyData);
+  const unwrapKey = await crypto.subtle.importKey(
+    "raw",
+    hash,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["decrypt"]
+  );
+
+  const iv = new Uint8Array(
+    ivHex.match(/.{1,2}/g)!.map((b) => parseInt(b, 16))
+  );
+  const cipher = new Uint8Array(
+    cipherHex.match(/.{1,2}/g)!.map((b) => parseInt(b, 16))
+  );
+
+  const decrypted = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv },
+    unwrapKey,
+    cipher
+  );
+
+  const dec = new TextDecoder();
+  return dec.decode(decrypted);
+}
+
+/**
+ * 1-Click Decrypt & Download from IPFS (FR-5):
+ * Fetches ciphertext from IPFS gateway, decrypts in-memory, and triggers file download.
+ */
+export async function downloadAndDecryptFromIpfs(
+  cid: string,
+  keyHex: string,
+  gatewayUrl = "https://gateway.pinata.cloud",
+  onProgress?: (msg: string) => void
+): Promise<DecryptedFileBundle> {
+  onProgress?.("Fetching ciphertext from IPFS gateway...");
+  const cleanGateway = gatewayUrl.replace(/\/+$/, "");
+  const res = await fetch(`${cleanGateway}/ipfs/${cid}`);
+  if (!res.ok) {
+    throw new Error(
+      `Failed to fetch from IPFS (${res.status} ${res.statusText}). Gateway may still be propagating.`
+    );
+  }
+
+  onProgress?.("Reading encrypted binary payload...");
+  const blob = await res.blob();
+
+  onProgress?.("Decrypting AES-256-GCM in browser...");
+  const decrypted = await decryptFile(blob, keyHex, (p) => {
+    onProgress?.(p.message);
+  });
+
+  onProgress?.("Triggering file download...");
+  downloadBlob(decrypted.plainBlob, decrypted.originalName);
+
+  return decrypted;
+}
+

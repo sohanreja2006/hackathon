@@ -2,38 +2,19 @@ import React from "react";
 import type { Metadata } from "next";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
-import { StatCard } from "@/components/dashboard/StatCard";
+import { DashboardStats } from "@/components/dashboard/DashboardStats";
 import { RecentFiles } from "@/components/dashboard/RecentFiles";
 import { SecurityStatus } from "@/components/dashboard/SecurityStatus";
 import { 
-  FileBox, 
-  Lock, 
-  HardDrive, 
-  Share2, 
   UploadCloud, 
-  Plus
+  Plus,
+  Shield
 } from "lucide-react";
 import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Vault Dashboard | CYBER-10 Decentralized Storage",
   description: "Manage your client-encrypted files, IPFS decentralized pins, and sovereign access grants.",
-};
-
-/**
- * MOCK METRICS FOR PHASE 1
- * 
- * TODO: [PHASE 4 & 5 - DATA INTEGRATION]
- * Connect this to real-time on-chain contracts or indexing services
- * to dynamically query user's actual vault statistics.
- */
-const MOCK_STORAGE_STATS = {
-  totalFiles: 24,
-  encryptedFiles: 24,
-  storageUsedFormatted: "1.42 GB",
-  storageQuotaFormatted: "Unlimited (P2P)",
-  sharedFiles: 6,
-  encryptionIntegrity: "100%",
 };
 
 export default function DashboardPage() {
@@ -46,44 +27,8 @@ export default function DashboardPage() {
         {/* Security / Cryptographic Engine Telemetry */}
         <SecurityStatus />
 
-        {/* Main Dashboard Stat Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <StatCard
-            title="Total Files"
-            value={MOCK_STORAGE_STATS.totalFiles}
-            subtitle="Indexed in sovereign vault"
-            icon={FileBox}
-            badge="Phase 1 Mock"
-            badgeVariant="default"
-          />
-
-          <StatCard
-            title="Encrypted Files"
-            value={MOCK_STORAGE_STATS.encryptedFiles}
-            subtitle="Client-side AES-GCM-256"
-            icon={Lock}
-            badge="100% Protected"
-            badgeVariant="cyber"
-          />
-
-          <StatCard
-            title="Storage Used"
-            value={MOCK_STORAGE_STATS.storageUsedFormatted}
-            subtitle={`Swarm Quota: ${MOCK_STORAGE_STATS.storageQuotaFormatted}`}
-            icon={HardDrive}
-            badge="P2P IPFS"
-            badgeVariant="success"
-          />
-
-          <StatCard
-            title="Shared Files"
-            value={MOCK_STORAGE_STATS.sharedFiles}
-            subtitle="Active asymmetric access grants"
-            icon={Share2}
-            badge="Non-Revoked"
-            badgeVariant="warning"
-          />
-        </div>
+        {/* Main Dashboard Dynamic Stat Cards */}
+        <DashboardStats />
 
         {/* Action Banner — Phase 3 Live */}
         <div className="mb-8 rounded-xl border border-cyan-500/20 bg-gradient-to-r from-cyan-950/30 via-zinc-900/60 to-zinc-900/40 p-5 backdrop-blur-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">

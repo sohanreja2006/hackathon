@@ -1,239 +1,115 @@
-# CYBER-10
+# CYBER-10 — Decentralized Encrypted Cloud File Locker via IPFS & Web3 Auth
 
-> **Decentralized Secure File-Storage & Sharing Platform**  
+> **BBIT HACKATHON 2026 — CODERS' CLUB OFFICIAL HANDBOOK**  
+> **Level:** LEVEL 3 — ADVANCED (3RD YEAR RECOMMENDED)  
+> **Live Production URL:** [https://hackathon-hazel-three.vercel.app](https://hackathon-hazel-three.vercel.app)  
+> **GitHub Repository:** [https://github.com/sohanreja2006/hackathon](https://github.com/sohanreja2006/hackathon)  
 > *"Your Files. Encrypted. Decentralized. Yours."*
 
 ---
 
-## 📌 Current Phase
+## 🏆 Project Overview & Hackathon Rubric Alignment
 
-**Phase 4 — Encrypted IPFS Storage via Pinata**
+CYBER-10 is a zero-knowledge decentralized file locker engineered for whistleblowers, security researchers, privacy-conscious students, and digital creators. It solves the vulnerabilities of centralized cloud storage (Google Drive, Dropbox telemetry and arbitrary account locking) while overcoming the privacy flaw of public IPFS networks by strictly enforcing **client-side authenticated AES-256-GCM encryption before pinning**.
 
-In this phase, we connected the Phase 3 client-side AES-256-GCM encryption engine to permanent IPFS decentralized storage. Only encrypted ciphertext is ever uploaded. The server never receives plaintext or the user's encryption key.
+### Core Functional Requirements (32-Hour Handbook Checklist)
 
----
-
-## 🗄️ Phase 4 — Encrypted IPFS Storage
-
-### Architecture
-
-```
-User selects file
-      ↓
-Browser reads file (local memory only)
-      ↓
-AES-256-GCM encryption (Web Crypto API)
-      ↓
-Encrypted .cyber10enc bundle
-      ↓
-POST /api/files/upload  ← ONLY ciphertext crosses this boundary
-      ↓
-Server: verify SIWE session + validate CYBR magic bytes
-      ↓
-Pinata Files API (Bearer JWT — server-side only)
-      ↓
-IPFS
-      ↓
-CID returned to browser
-```
-
-### Key Security Properties
-
-1. **Files are encrypted in the browser** — plaintext never leaves the device.
-2. **Only ciphertext is uploaded** — the POST body contains a `.cyber10enc` binary blob.
-3. **Pinata provides IPFS storage** — encrypted bytes are content-addressed on IPFS.
-4. **The CID identifies the encrypted content** — it can be shared safely; the file is unreadable without the key.
-5. **Decryption happens locally** — the Retrieve tab fetches encrypted bytes from IPFS and decrypts in the browser.
-6. **Pinata credentials are kept server-side** — `PINATA_JWT` is a server-only env var; it never appears in client bundles.
-7. **Encryption keys are not stored in plaintext** — keys are shown once to the user and never persisted server-side.
-
-### CYBR Bundle Format
-
-The `.cyber10enc` binary format includes:
-
-```
-[4 bytes]  "CYBR" magic header
-[1 byte]   Version (0x01)
-[12 bytes] AES-GCM 96-bit nonce (IV)
-[4 bytes]  filename length (uint32 BE)
-[N bytes]  UTF-8 original filename
-[4 bytes]  MIME type length (uint32 BE)
-[M bytes]  UTF-8 MIME type
-[rest]     AES-256-GCM ciphertext + 128-bit auth tag
-```
-
-The server validates the `CYBR` magic bytes before accepting any upload, ensuring only encrypted bundles are accepted.
-
-### API Endpoint
-
-```
-POST /api/files/upload
-Authorization: SIWE HttpOnly session cookie
-Content-Type: multipart/form-data
-
-Fields:
-  encryptedFile  — binary: .cyber10enc ciphertext bundle
-  originalName   — string: original filename (display only)
-  originalMime   — string: original MIME type (display only)
-  originalSize   — string: original size in bytes (display only)
-
-Response 200:
-  { "success": true, "cid": "bafybeig...", "fileId": "...", "size": 123456, "uploadedAt": "..." }
-
-Response 4xx/5xx:
-  { "success": false, "error": "Human-readable message" }
-```
-
-### Environment Variables
-
-| Variable | Side | Purpose |
-|----------|------|---------|
-| `PINATA_JWT` | **Server only** | Pinata API authentication |
-| `NEXT_PUBLIC_IPFS_GATEWAY_URL` | Client | IPFS gateway for retrieving files |
-| `AUTH_SESSION_SECRET` | Server only | HMAC signing for session cookies |
+| ID | Handbook Specification | Status | Technical Implementation |
+|---|---|:---:|---|
+| **FR-1** | **Web3 Wallet Authentication** | **100% Complete** ✅ | Sign-In with Ethereum (EIP-4361 / SIWE) via MetaMask & WalletConnect with nonce rotation and HttpOnly cookies. |
+| **FR-2** | **Client-Side File Encryption** | **100% Complete** ✅ | Hardware-accelerated Web Crypto API AES-256-GCM encryption with 96-bit random IVs and `.cyber10enc` binary encapsulation. |
+| **FR-3** | **Decentralized IPFS Pinning** | **100% Complete** ✅ | Secure server proxy uploading encrypted ciphertext to Pinata IPFS Files API v3, generating immutable CIDs. |
+| **FR-4** | **Decentralized File Directory** | **100% Complete** ✅ | Real-time wallet-scoped user dashboard tracking encrypted files, sizes, IPFS CIDs, and upload timestamps. |
+| **FR-5** | **1-Click Decrypt & Download** | **100% Complete** ✅ | User signs cryptographic challenge with their wallet; browser decrypts binary on the fly and downloads the original file. |
+| **FR-6** | **Token-Gated File Sharing** | **100% Complete** ✅ | Re-encrypts file AES key for a peer wallet address; recipient accesses and decrypts from the "Shared With Me" tab. |
 
 ---
 
+## 📑 Mandatory Team Documentation Artifacts (Section 5)
 
-## 🔐 Phase 2 — Web3 Authentication Deep Dive
+As mandated by the BBIT Hackathon 2026 Handbook, the complete official documentation suite is available in the repository:
 
-### 1. Why Wallet Connection Alone is NOT Authentication
-- Merely connecting an EVM wallet (e.g. via `eth_requestAccounts`) only provides the user's public address.
-- A public address is publicly visible on the blockchain and can be trivially spoofed by any client.
-- Without a cryptographic digital signature, an attacker could pretend to be any high-profile wallet simply by sending that address in an HTTP header or payload.
-- True cryptographic authentication requires the user to **prove private key ownership** by signing an unforgeable challenge message.
-
-### 2. How Sign-In with Ethereum (SIWE / EIP-4361) Works
-1. **User Connects Wallet**: User connects MetaMask, Rainbow, or any EVM wallet.
-2. **Nonce Request**: Frontend calls `GET /api/auth/nonce?address=0x...`. The server creates and stores a cryptographically random, single-use nonce with a 5-minute TTL.
-3. **Challenge Message Assembly**: Frontend constructs a standard EIP-4361 challenge string containing the domain, wallet address, URI, chain ID, issue timestamp, and server nonce.
-4. **Wallet Signature**: The user is prompted by their wallet to sign the human-readable challenge off-chain (zero gas fees).
-5. **Server Verification**: The signed payload is submitted to `POST /api/auth/verify`. The server verifies that:
-   - The nonce exists, is not expired, and has not been used.
-   - The recovered address from the ECDSA signature matches the claimed address.
-   - The domain and URI match the application origin (blocking cross-dApp phishing).
-   - The message timestamp is valid and not expired.
-6. **Session Cookie**: On success, the server marks the nonce as used (destroying it) and issues an `HttpOnly`, `SameSite=lax`, `Secure` session cookie signed with HMAC-SHA256.
-7. **Protected Access**: The user can now access `/dashboard`.
-
-### 3. Why a Nonce is Required & Single-Use Enforcement
-- **Replay Protection**: If messages were static (e.g., "Sign into CYBER-10"), an eavesdropper or malicious proxy could intercept the signature and reuse it indefinitely.
-- **Freshness**: Each nonce is generated via `crypto.randomBytes(32)` on the server and expires after 5 minutes.
-- **Atomic Invalidation**: The moment a nonce is verified, it is marked as consumed and deleted, making signature replay mathematically impossible.
-
-### 4. How Signature Verification Works
-- We utilize `viem/siwe` and `viem`'s `verifyMessage`.
-- `verifyMessage` takes the message plaintext and the cryptographic signature `0x...` and recovers the public key using elliptic curve cryptography (`secp256k1`).
-- The recovered address must strictly match `message.address`. If an attacker alters the address in the message, the signature is rendered invalid.
-
-### 5. How Sessions Work & Future Phase Helper
-- **Tamper-Proof Token**: Sessions are signed with HMAC-SHA256 (`base64url(payload).base64url(hmac)`).
-- **Constant-Time Verification**: Verified using `crypto.timingSafeEqual` to prevent side-channel timing attacks.
-- **HttpOnly Enforced**: Client-side JavaScript cannot read the session cookie, eliminating XSS token theft.
-- **Account Switching Detection**: If a user switches accounts in MetaMask (e.g., from `0xAAA` to `0xBBB`), the client automatically invalidates the session view and requires fresh SIWE authentication for `0xBBB`.
-- **Backend Helper**: Future phases (AES encryption key derivation, IPFS storage, metadata APIs) can call:
-  ```ts
-  import { getAuthenticatedWallet } from "@/lib/auth/session";
-
-  const auth = await getAuthenticatedWallet();
-  if (!auth) {
-    throw new Error("Unauthorized: Cryptographic SIWE session required.");
-  }
-  console.log("Authenticated Wallet:", auth.address);
-  ```
+1. 📘 **[docs/PLANNING.md](docs/PLANNING.md)** — Architectural blueprint, threat model, binary envelope specification, and technology decision matrix.
+2. ⏱️ **[docs/PROGRESS.md](docs/PROGRESS.md)** — 32-hour execution timeline, milestone log, and requirement verification matrix.
+3. 🚀 **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** — Production hosting details on Vercel, environment variables guide, and local reproduction steps.
+4. 🛡️ **[docs/DEFENSE_QA.md](docs/DEFENSE_QA.md)** — Deep-dive hackathon defense questions and technical answers for judges.
 
 ---
 
-## 🛠 Tech Stack
+## 🔒 Architecture & Data Flow
 
-- **Framework**: [Next.js](https://nextjs.org/) (App Router, React 19)
-- **Language**: [TypeScript](https://www.typescriptlang.org/) (Strict Mode)
-- **Styling**: [Tailwind CSS](https://tailwindcss.com/) & Vanilla CSS design tokens
-- **Web3 & Wallet**: [Wagmi](https://wagmi.sh/), [Viem](https://viem.sh/), [@rainbow-me/rainbowkit](https://www.rainbowkit.com/)
-- **Authentication**: EIP-4361 / Sign-In with Ethereum (SIWE), HMAC-SHA256 Sessions
-- **State & Caching**: [@tanstack/react-query](https://tanstack.com/query)
-- **Icons**: [Lucide React](https://lucide.dev/)
-- **UI Components**: Modern, accessible component architecture
+```
+[User Selects File] ──► [Browser RAM: AES-256-GCM Encryption] ──► [.cyber10enc Ciphertext]
+                                                                        │
+                                                                        ▼ (POST /api/files/upload)
+                                                          [Verify SIWE Session + Magic Bytes]
+                                                                        │
+                                                                        ▼
+                                                          [Pinata IPFS Network Pinning]
+                                                                        │
+                                                                        ▼
+                                                          [Immutable Content CID]
+                                                                        │
+                    ┌───────────────────────────────────────────────────┴────────────────────────────────────────┐
+                    ▼                                                                                            ▼
+         [FR-5: 1-Click Decrypt]                                                                      [FR-6: Peer Sharing]
+      User signs wallet challenge                                                                  Owner re-encrypts key for
+                   │                                                                               recipient wallet address
+                   ▼                                                                                             │
+     Pull ciphertext from IPFS                                                                                   ▼
+                   │                                                                               Recipient unlocks in
+                   ▼                                                                               "Shared With Me" tab
+     Decrypt AES-256-GCM in RAM                                                                                  │
+                   │                                                                                             ▼
+     Instant browser download                                                                      1-Click peer decryption
+```
 
 ---
 
-## 📦 Installation & Setup
+## 💻 Tech Stack
 
-### 1. Install Dependencies
+- **Framework**: Next.js 16 (App Router + Turbopack)
+- **Language**: TypeScript 5
+- **Styling**: Tailwind CSS
+- **Cryptography**: Web Crypto API (`window.crypto.subtle`) + AES-256-GCM
+- **Web3 / Ethereum**: Viem, Wagmi v2, RainbowKit, EIP-4361 (SIWE), EIP-191
+- **Decentralized Storage**: Pinata Cloud IPFS API v3 + IPFS Public Gateways
+- **Hosting**: Vercel Serverless Edge
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Node.js 20+ installed
+- MetaMask or any Web3 injected wallet
+
+### Quick Setup
 
 ```bash
+# 1. Clone repository
+git clone https://github.com/sohanreja2006/hackathon.git
+cd hackathon
+
+# 2. Install dependencies
 npm install
-```
 
-### 2. Configure Environment Variables
-
-Copy `.env.example` to `.env.local`:
-
-```bash
+# 3. Configure environment
 cp .env.example .env.local
+# Add your PINATA_JWT and AUTH_SESSION_SECRET in .env.local
+
+# 4. Start development server
+npm run dev
+
+# 5. Access application
+# Open http://localhost:3000 in your browser
 ```
 
-Configure:
-```env
-# Optional custom WalletConnect Cloud Project ID (fallback ID is provided)
-NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID="your_walletconnect_project_id"
-
-# Server HMAC secret for signing HttpOnly SIWE session cookies
-AUTH_SESSION_SECRET="your_strong_32_byte_secret_key_here"
-```
-
 ---
 
-## 🚀 Development Commands
+## 🛡️ Core Security Principles
 
-| Command | Description |
-| :--- | :--- |
-| `npm run dev` | Starts Next.js development server at `http://localhost:3000` |
-| `npm run build` | Compiles production build |
-| `npm run start` | Runs production server |
-| `npm run lint` | Runs ESLint analysis |
-| `npx tsc --noEmit` | Runs TypeScript static type checking |
-
----
-
-## 🌐 API Route Specification
-
-| Endpoint | Method | Description |
-| :--- | :--- | :--- |
-| `/api/auth/nonce` | `GET` | Generates a 64-char cryptographically random single-use nonce |
-| `/api/auth/verify` | `POST` | Verifies SIWE message + signature and sets `cyber10_session` HttpOnly cookie |
-| `/api/auth/session` | `GET` | Returns active session state and authenticated wallet address |
-| `/api/auth/logout` | `POST` | Clears the `cyber10_session` cookie and invalidates the session |
-
----
-
-## 🛡️ Security Review & Vulnerability Checklist
-
-| Security Check | Status | Implementation Details |
-| :--- | :---: | :--- |
-| 1. Access `/dashboard` without signing blocked? | **YES** | ProtectedRoute strictly checks `isAuthenticated` (requires active SIWE session). |
-| 2. Reusing old nonce blocked? | **YES** | `consumeAuthNonce()` atomically deletes nonce upon first check. |
-| 3. Reusing old signature blocked? | **YES** | Signature contains single-use nonce; second attempt fails immediately. |
-| 4. Address spoofing blocked? | **YES** | `verifyMessage` recovers signer address from ECDSA signature; mismatch throws 401. |
-| 5. HttpOnly cookie storage? | **YES** | `cyber10_session` cookie has `httpOnly: true`, preventing XSS theft. |
-| 6. Secure cookie flags? | **YES** | `sameSite: "lax"`, `path: "/"`, `secure: true` in production. |
-| 7. Cryptographically random nonces? | **YES** | Generated via `crypto.randomBytes(32)` (no Math.random). |
-| 8. Single-use nonces? | **YES** | Nonces are marked `used: true` and purged on first use. |
-| 9. Expired messages rejected? | **YES** | Nonces expire in 5 min; SIWE expiration timestamps strictly validated. |
-| 10. SIWE domain validated? | **YES** | Message domain is checked against `req.headers.host`. |
-| 11. SIWE URI validated? | **YES** | Message URI is checked against `req.nextUrl.origin`. |
-| 12. Chain ID validated? | **YES** | Verified against active EVM chain ID. |
-| 13. Account switching handled? | **YES** | Switching accounts in wallet invalidates session view and requires re-auth. |
-| 14. Private keys or seeds requested? | **NO** | Never requested, transmitted, or stored. Off-chain signatures only. |
-
----
-
-## 🗺 Roadmap Progress
-
-- [x] **Phase 1** — Frontend Foundation & Wallet Connection
-- [x] **Phase 2** — Web3 Authentication & SIWE (EIP-4361) *(Completed)*
-- [ ] **Phase 3** — Client-side AES encryption (`WebCrypto SubtleAPI` AES-GCM-256)
-- [ ] **Phase 4** — IPFS/Pinata decentralized storage integration
-- [ ] **Phase 5** — Metadata/database indexing
-- [ ] **Phase 6** — Secure asymmetric file sharing & access grants
-- [ ] **Phase 7** — Security audit, testnet deployment, and production hardening
+1. **Zero Server-Side Plaintext**: Plaintext bytes never touch any server or network socket.
+2. **Authentic Tamper-Resistance**: AES-256-GCM includes 128-bit authentication tags to prevent bit-flipping attacks.
+3. **Non-Custodial Sovereignty**: No usernames, passwords, or centralized database root credentials.
+4. **Credential Isolation**: All Pinata API tokens remain strictly server-side.

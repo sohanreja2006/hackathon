@@ -36,6 +36,8 @@ import { encryptFile, formatBytes, type CryptoProgress } from "@/lib/crypto";
 import { getIpfsUrl } from "@/lib/ipfs/gateway";
 import { cn } from "@/lib/utils";
 import type { VaultUploadStage, UploadApiResponse } from "@/types/files";
+import { useAccount } from "wagmi";
+import { saveUserFile } from "@/lib/fileStorage";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Stage metadata
@@ -344,6 +346,7 @@ function CidDisplay({ cid, uploadedAt, size }: { cid: string; uploadedAt: string
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function VaultUploadPanel() {
+  const { address } = useAccount();
   const [stage, setStage] = useState<VaultUploadStage>("idle");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [keyHex, setKeyHex] = useState<string | null>(null);
@@ -447,7 +450,26 @@ export function VaultUploadPanel() {
     setStage("uploaded");
     setStatusMessage("Successfully uploaded to IPFS.");
     setCryptoProgress(null);
-  }, [selectedFile]);
+
+    // Auto-save to Decentralized File Directory (FR-4)
+    if (address && bundle.keyHex) {
+      const ext = selectedFile.name.split(".").pop()?.toUpperCase() || "BIN";
+      saveUserFile({
+        id: `cyber-${Date.now()}`,
+        cid: apiResponse.cid,
+        fileName: selectedFile.name,
+        originalName: selectedFile.name,
+        extension: ext,
+        fileSize: selectedFile.size,
+        mimeType: selectedFile.type || "application/octet-stream",
+        uploadedAt: apiResponse.uploadedAt || new Date().toISOString(),
+        ownerAddress: address.toLowerCase(),
+        keyHex: bundle.keyHex,
+        algorithm: "AES-256-GCM",
+        sharedWith: [],
+      });
+    }
+  }, [selectedFile, address]);
 
   return (
     <div className="space-y-5">
