@@ -4,6 +4,8 @@ import React from "react";
 import { Shield, Lock, KeyRound, AlertTriangle, ArrowLeft, Loader2, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { useAuthStatus } from "@/hooks/useAuthStatus";
+import { useVaultXWallet } from "@/context/VaultXWalletContext";
+import { useGoogleAuth } from "@/hooks/useGoogleAuth";
 import { WalletConnectButton } from "@/components/wallet/WalletConnectButton";
 import { Button } from "@/components/ui/button";
 import { formatAddress } from "@/lib/utils";
@@ -13,13 +15,11 @@ interface ProtectedRouteProps {
 }
 
 /**
- * ProtectedRoute Gate (Phase 2)
+ * ProtectedRoute Gate (Enhanced with VaultX Secure Wallet)
  * 
- * Strict two-tier cryptographic access gate:
- * Tier 1: EVM Wallet Connection (Wagmi)
- * Tier 2: Cryptographic Signature Verification (EIP-4361 / SIWE with HttpOnly session cookie)
- * 
- * Unauthenticated users are strictly barred from rendering dashboard contents.
+ * Supports dual-tier cryptographic access:
+ * Option 1: EVM Wallet Connection + SIWE Signature (MetaMask)
+ * Option 2: VaultX Secure Wallet Identity (Client-Side Key Manager)
  */
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const {
@@ -35,15 +35,23 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     disconnect,
   } = useAuthStatus();
 
+  const { identity: vaultXIdentity, isConnected: isVaultXConnected } = useVaultXWallet();
+  const { isGoogleAuthenticated, isGoogleLoading, googleUser } = useGoogleAuth();
+
   // 1. Initial SSR / Hydration / Session Handshake loading state
-  if (!isMounted || isConnecting || isCheckingSession) {
+  // Google-authenticated users skip all wallet checks — they have their own session
+  if (isGoogleAuthenticated && googleUser) {
+    return <>{children}</>;
+  }
+
+  if (!isMounted || isConnecting || isCheckingSession || isGoogleLoading) {
     return (
       <div className="flex min-h-[70vh] flex-col items-center justify-center p-6 text-center">
         <div className="relative mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-cyan-500/30 bg-zinc-900 shadow-lg shadow-cyan-500/10">
           <Shield className="h-7 w-7 text-cyan-400 animate-pulse" />
         </div>
         <div className="font-mono text-sm text-zinc-300">
-          Checking EVM Wallet & Cryptographic Session...
+          Checking Authentication Session...
         </div>
         <p className="mt-1 text-xs text-zinc-500">
           Validating sovereign credentials with zero-knowledge gateway
@@ -52,8 +60,9 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     );
   }
 
-  // 2. Disconnected State: Prompt user to connect wallet first
-  if (!isConnected || !address) {
+  // 2. Disconnected State: Prompt user to connect either MetaMask or VaultX Secure Wallet
+  const anyConnected = (isConnected && address) || (isVaultXConnected && vaultXIdentity);
+  if (!anyConnected) {
     return (
       <div className="mx-auto flex min-h-[75vh] max-w-lg flex-col items-center justify-center px-4 py-16 text-center">
         <div className="relative mb-6">
@@ -80,8 +89,22 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
           </p>
         </div>
 
-        <div className="w-full flex justify-center mb-6">
-          <WalletConnectButton size="lg" className="w-full sm:w-auto min-w-[220px]" />
+        <div className="w-full flex flex-col sm:flex-row items-center gap-3 mb-6">
+          {/* Google Sign-In Option */}
+          <Link
+            href="/auth/signin"
+            className="flex-1 flex items-center justify-center gap-2.5 rounded-xl border border-zinc-700 bg-zinc-900 px-5 py-3 text-sm font-medium text-zinc-200 transition-all hover:bg-zinc-800 hover:border-zinc-600"
+          >
+            <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" aria-hidden>
+              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+            </svg>
+            Sign in with Google
+          </Link>
+          {/* MetaMask Option */}
+          <WalletConnectButton size="lg" className="flex-1 w-full sm:w-auto min-w-[180px]" />
         </div>
 
         <div className="w-full rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-4 text-left text-xs font-mono space-y-2 mb-6">
@@ -105,8 +128,8 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     );
   }
 
-  // 3. Connected But NOT Authenticated State: Require SIWE Signature Verification
-  if (!isAuthenticated) {
+  // 3. Connected with MetaMask But NOT Authenticated: Require SIWE Signature Verification (if VaultX not connected)
+  if (!isAuthenticated && !isVaultXConnected) {
     const isWorking =
       authStage === "requesting_nonce" ||
       authStage === "awaiting_signature" ||

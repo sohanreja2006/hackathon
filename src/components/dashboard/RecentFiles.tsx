@@ -18,18 +18,25 @@ import {
   AlertCircle,
   X,
   ShieldAlert,
-  ArrowRight
+  ArrowRight,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import Link from "next/link";
 import { formatBytes, downloadAndDecryptFromIpfs, reencryptKeyForRecipient, decryptKeyForRecipient } from "@/lib/crypto";
-import { getUserFiles, getSharedWithMeFiles, recordFileShare, StoredEncryptedFile, SharedFileRecord } from "@/lib/fileStorage";
+import { getUserFiles, getAllVaultFiles, getSharedWithMeFiles, recordFileShare, StoredEncryptedFile, SharedFileRecord } from "@/lib/fileStorage";
 import { useAccount, useSignMessage } from "wagmi";
 import { isAddress } from "viem";
 import { getIpfsUrl } from "@/lib/ipfs/gateway";
+import { useVaultXWallet } from "@/context/VaultXWalletContext";
 
 export function RecentFiles() {
   const { address, isConnected } = useAccount();
   const { signMessageAsync } = useSignMessage();
+  const { identity: vaultXIdentity, isConnected: isVaultXConnected } = useVaultXWallet();
+
+  // Resolved owner key: MetaMask address takes precedence, fall back to VaultX id
+  const ownerKey = address?.toLowerCase() ?? (isVaultXConnected ? vaultXIdentity?.id : null) ?? null;
 
   const [activeTab, setActiveTab] = useState<"my_files" | "shared_with_me">("my_files");
   const [searchTerm, setSearchTerm] = useState("");
@@ -46,6 +53,13 @@ export function RecentFiles() {
   const [decryptProgress, setDecryptProgress] = useState<string>("");
   const [readyDownload, setReadyDownload] = useState<{ name: string; url: string } | null>(null);
 
+  // Decrypt Key Prompt Modal State
+  const [decryptModalFile, setDecryptModalFile] = useState<StoredEncryptedFile | null>(null);
+  const [manualKeyInput, setManualKeyInput] = useState("");
+  const [showKeyInput, setShowKeyInput] = useState(false);
+  const [decryptModalError, setDecryptModalError] = useState<string | null>(null);
+  const [isDecryptingModal, setIsDecryptingModal] = useState(false);
+
   // Share modal state (FR-6)
   const [sharingFile, setSharingFile] = useState<StoredEncryptedFile | null>(null);
   const [recipientInput, setRecipientInput] = useState("");
@@ -54,20 +68,24 @@ export function RecentFiles() {
   const [isSharing, setIsSharing] = useState(false);
   const [shareSuccess, setShareSuccess] = useState(false);
 
-  // Load user files from registry
+  // Load all user files from registry — comprehensive search across all known addresses and local keys
   const refreshFiles = useCallback(() => {
-    if (address) {
-      setMyFiles(getUserFiles(address));
-      setSharedFiles(getSharedWithMeFiles(address));
-    } else {
-      setMyFiles([]);
-      setSharedFiles([]);
-    }
-  }, [address]);
+    const allFiles = getAllVaultFiles([address, vaultXIdentity?.id]);
+    setMyFiles(allFiles);
+    setSharedFiles(address ? getSharedWithMeFiles(address) : []);
+  }, [address, vaultXIdentity]);
 
   useEffect(() => {
     refreshFiles();
+    const handleFocus = () => refreshFiles();
+    window.addEventListener("focus", handleFocus);
+    window.addEventListener("storage", handleFocus);
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("storage", handleFocus);
+    };
   }, [refreshFiles]);
+
 
   const handleCopy = (text: string, type: "cid" | "key") => {
     navigator.clipboard.writeText(text);
@@ -81,45 +99,81 @@ export function RecentFiles() {
   };
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // FR-5: 1-Click Decrypt & Download via Wallet Signature Challenge
+  // FR-5: Decrypt with Key Verification
+  // Prompts user for the 256-bit AES key before decrypting from IPFS
   // ─────────────────────────────────────────────────────────────────────────────
-  const handleOneClickDecrypt = async (file: StoredEncryptedFile) => {
-    if (!address) {
-      setActiveNotification("Please connect your Web3 wallet first.");
+  const handleOpenDecryptModal = (file: StoredEncryptedFile) => {
+    setDecryptModalFile(file);
+    setManualKeyInput("");
+    setShowKeyInput(false);
+    setDecryptModalError(null);
+  };
+
+  const handleCloseDecryptModal = () => {
+    if (isDecryptingModal) return;
+    setDecryptModalFile(null);
+    setManualKeyInput("");
+    setShowKeyInput(false);
+    setDecryptModalError(null);
+  };
+
+  const handleConfirmDecryptWithKey = async () => {
+    if (!decryptModalFile) return;
+
+    const key = manualKeyInput.trim();
+    if (!key) {
+      setDecryptModalError("Please enter the 64-character AES-256 decryption key.");
+      return;
+    }
+
+    if (key.length !== 64 || !/^[0-9a-fA-F]{64}$/.test(key)) {
+      setDecryptModalError("Invalid key format: AES key must be exactly 64 hexadecimal characters.");
       return;
     }
 
     try {
-      setDecryptingCid(file.cid);
-      setDecryptProgress("Requesting wallet cryptographic signature...");
+      setIsDecryptingModal(true);
+      setDecryptModalError(null);
+      setDecryptingCid(decryptModalFile.cid);
+      setDecryptProgress("Fetching ciphertext from IPFS gateway...");
 
-      // Cryptographic signature challenge verified by user's wallet
-      const challenge = [
-        "CYBER-10 Protocol Sovereign Decrypt Verification",
-        `File: ${file.fileName}`,
-        `IPFS CID: ${file.cid}`,
-        `Wallet: ${address.toLowerCase()}`,
-        `Timestamp: ${new Date().toISOString()}`,
-        "Action: Authorize local AES-256-GCM zero-knowledge decryption.",
-      ].join("\n");
-
-      await signMessageAsync({ message: challenge });
-
-      setDecryptProgress("Signature verified. Fetching ciphertext from IPFS...");
       const decrypted = await downloadAndDecryptFromIpfs(
-        file.cid,
-        file.keyHex,
+        decryptModalFile.cid,
+        key,
         undefined,
         (msg) => setDecryptProgress(msg)
       );
 
       const url = window.URL.createObjectURL(decrypted.plainBlob);
       setReadyDownload({ name: decrypted.originalName, url });
-      setActiveNotification(`Decrypted: ${file.fileName}`);
+      setActiveNotification(`Decrypted: ${decrypted.originalName}`);
+
+      // Auto-trigger direct browser file download
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = decrypted.originalName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      // Close modal
+      setDecryptModalFile(null);
+      setManualKeyInput("");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Decryption failed.";
-      setActiveNotification(`Decryption error: ${msg}`);
+      if (
+        msg.toLowerCase().includes("operation failed") ||
+        msg.toLowerCase().includes("operationerror") ||
+        msg.toLowerCase().includes("tag") ||
+        msg.toLowerCase().includes("mac") ||
+        msg.toLowerCase().includes("decrypt")
+      ) {
+        setDecryptModalError("Decryption failed: Incorrect key. The AES-256-GCM authentication tag did not match.");
+      } else {
+        setDecryptModalError(`Decryption error: ${msg}`);
+      }
     } finally {
+      setIsDecryptingModal(false);
       setDecryptingCid(null);
       setDecryptProgress("");
     }
@@ -256,7 +310,7 @@ export function RecentFiles() {
   return (
     <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/60 backdrop-blur-md overflow-hidden">
       {/* Table Header Controls */}
-      <div className="p-5 border-b border-zinc-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="files-header-row p-5 border-b border-zinc-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-3">
             <h2 className="text-lg font-bold text-zinc-100 flex items-center gap-2">
@@ -297,7 +351,7 @@ export function RecentFiles() {
         </div>
 
         {/* Search Filter */}
-        <div className="relative max-w-xs w-full">
+        <div className="files-search-wrap relative max-w-xs w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-500" />
           <input
             type="text"
@@ -358,7 +412,7 @@ export function RecentFiles() {
       {/* TAB 1: MY VAULT FILES */}
       {activeTab === "my_files" && (
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs font-mono">
+          <table className="file-table-mobile-card w-full text-left text-xs font-mono">
             <thead className="border-b border-zinc-800 bg-zinc-950/60 text-zinc-400 uppercase text-[10px] tracking-wider">
               <tr>
                 <th className="py-3 px-5">File Name & IPFS CID</th>
@@ -411,12 +465,12 @@ export function RecentFiles() {
                   </td>
 
                   {/* Size */}
-                  <td className="py-3.5 px-4 text-zinc-400">
+                  <td data-label="Size" className="py-3.5 px-4 text-zinc-400">
                     {formatBytes(file.fileSize)}
                   </td>
 
                   {/* Encryption Status */}
-                  <td className="py-3.5 px-4">
+                  <td data-label="Encryption" className="py-3.5 px-4">
                     <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-500/30 bg-cyan-950/40 px-2 py-0.5 text-[10px] text-cyan-300">
                       <span className="h-1.5 w-1.5 rounded-full bg-cyan-400" />
                       AES-256-GCM
@@ -424,7 +478,7 @@ export function RecentFiles() {
                   </td>
 
                   {/* Date */}
-                  <td className="py-3.5 px-4 text-zinc-500 text-[11px]">
+                  <td data-label="Date" className="py-3.5 px-4 text-zinc-500 text-[11px]">
                     {new Date(file.uploadedAt).toLocaleDateString("en-US", {
                       month: "short",
                       day: "numeric",
@@ -433,7 +487,7 @@ export function RecentFiles() {
                   </td>
 
                   {/* Shares */}
-                  <td className="py-3.5 px-4 text-zinc-400 text-[11px]">
+                  <td data-label="Shares" className="py-3.5 px-4 text-zinc-400 text-[11px]">
                     {file.sharedWith && file.sharedWith.length > 0 ? (
                       <span className="text-purple-400 font-medium">
                         {file.sharedWith.length} Peer{file.sharedWith.length > 1 ? "s" : ""}
@@ -444,20 +498,20 @@ export function RecentFiles() {
                   </td>
 
                   {/* Actions */}
-                  <td className="py-3.5 px-5 text-right">
+                  <td data-label="Actions" className="py-3.5 px-5 text-right">
                     <div className="flex items-center justify-end gap-1.5">
-                      {/* FR-5: 1-Click Decrypt Button */}
+                      {/* Decrypt Button (Prompts for AES key) */}
                       <button
-                        onClick={() => handleOneClickDecrypt(file)}
+                        onClick={() => handleOpenDecryptModal(file)}
                         disabled={decryptingCid === file.cid}
                         type="button"
-                        title="1-Click Decrypt & Download (signs cryptographic challenge)"
+                        title="Decrypt file (requires AES-256 decryption key)"
                         className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-cyan-500/30 bg-cyan-950/30 text-cyan-300 hover:bg-cyan-500/20 hover:border-cyan-400 transition-all font-sans text-xs font-semibold"
                       >
                         {decryptingCid === file.cid ? (
                           <Loader2 className="h-3 w-3 animate-spin" />
                         ) : (
-                          <Download className="h-3 w-3" />
+                          <KeyRound className="h-3 w-3" />
                         )}
                         <span>Decrypt</span>
                       </button>
@@ -500,11 +554,11 @@ export function RecentFiles() {
               <div className="text-zinc-400 text-xs">
                 {searchTerm
                   ? "No encrypted files found matching your search."
-                  : isConnected
+                  : ownerKey
                   ? "You haven't uploaded any encrypted files to IPFS yet."
-                  : "Connect your Web3 wallet to access your encrypted file vault."}
+                  : "Connect MetaMask or VaultX Secure Wallet to access your encrypted file vault."}
               </div>
-              {isConnected && !searchTerm && (
+              {ownerKey && !searchTerm && (
                 <Link
                   href="/dashboard/vault"
                   className="inline-flex items-center gap-1.5 text-xs text-cyan-400 hover:text-cyan-300 font-semibold pt-1"
@@ -521,7 +575,7 @@ export function RecentFiles() {
       {/* TAB 2: SHARED WITH ME FILES (FR-6) */}
       {activeTab === "shared_with_me" && (
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs font-mono">
+          <table className="file-table-mobile-card w-full text-left text-xs font-mono">
             <thead className="border-b border-zinc-800 bg-zinc-950/60 text-zinc-400 uppercase text-[10px] tracking-wider">
               <tr>
                 <th className="py-3 px-5">File Name & CID</th>
@@ -564,7 +618,7 @@ export function RecentFiles() {
                   </td>
 
                   {/* Owner Address */}
-                  <td className="py-3.5 px-4 text-zinc-300">
+                  <td data-label="Shared By" className="py-3.5 px-4 text-zinc-300">
                     <span className="font-mono text-[11px] text-cyan-400">
                       {share.ownerAddress.substring(0, 6)}...{share.ownerAddress.slice(-4)}
                     </span>
@@ -576,12 +630,12 @@ export function RecentFiles() {
                   </td>
 
                   {/* Size */}
-                  <td className="py-3.5 px-4 text-zinc-400">
+                  <td data-label="Size" className="py-3.5 px-4 text-zinc-400">
                     {formatBytes(share.fileSize)}
                   </td>
 
                   {/* Date */}
-                  <td className="py-3.5 px-4 text-zinc-500 text-[11px]">
+                  <td data-label="Shared" className="py-3.5 px-4 text-zinc-500 text-[11px]">
                     {new Date(share.sharedAt).toLocaleDateString("en-US", {
                       month: "short",
                       day: "numeric",
@@ -590,7 +644,7 @@ export function RecentFiles() {
                   </td>
 
                   {/* Actions */}
-                  <td className="py-3.5 px-5 text-right">
+                  <td data-label="Actions" className="py-3.5 px-5 text-right">
                     <button
                       onClick={() => handleSharedDecrypt(share)}
                       disabled={decryptingCid === share.cid}
@@ -643,7 +697,7 @@ export function RecentFiles() {
           ───────────────────────────────────────────────────────────────────────────── */}
       {sharingFile && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-md rounded-xl border border-zinc-800 bg-zinc-900 p-6 shadow-2xl space-y-4">
+          <div className="responsive-modal w-full max-w-md rounded-xl border border-zinc-800 bg-zinc-900 p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
               <div className="flex items-center gap-2 text-zinc-100 font-semibold">
                 <Share2 className="h-4 w-4 text-purple-400" />
@@ -728,6 +782,144 @@ export function RecentFiles() {
                   <>
                     <ShieldCheck className="h-3.5 w-3.5" />
                     <span>Re-Encrypt & Grant Share</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────────────────────
+          Decrypt Key Prompt Modal
+          Prompts user for AES-256 key before decrypting and downloading
+          ───────────────────────────────────────────────────────────────────────────── */}
+      {decryptModalFile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="responsive-modal w-full max-w-lg rounded-xl border border-zinc-800 bg-zinc-900 p-6 shadow-2xl space-y-4">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+              <div className="flex items-center gap-2.5 text-zinc-100 font-semibold">
+                <div className="h-8 w-8 rounded-lg bg-cyan-950/60 border border-cyan-800/60 flex items-center justify-center text-cyan-400">
+                  <KeyRound className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Enter Decryption Key</h3>
+                  <p className="text-[11px] text-zinc-400 font-normal">Zero-knowledge client-side decryption</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleCloseDecryptModal}
+                disabled={isDecryptingModal}
+                className="text-zinc-500 hover:text-zinc-300 disabled:opacity-50 p-1 rounded-lg hover:bg-zinc-800/50 transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Target File Overview */}
+            <div className="p-3 rounded-lg bg-zinc-950/80 border border-zinc-800/80 space-y-1.5 text-xs font-mono">
+              <div className="flex justify-between items-center text-zinc-300">
+                <span className="text-zinc-500 font-sans">File Name:</span>
+                <span className="font-semibold text-white truncate max-w-[260px]">{decryptModalFile.fileName}</span>
+              </div>
+              <div className="flex justify-between items-center text-zinc-400">
+                <span className="text-zinc-500 font-sans">IPFS CID:</span>
+                <span className="truncate max-w-[260px] text-zinc-400 font-mono text-[11px]">{decryptModalFile.cid}</span>
+              </div>
+              <div className="flex justify-between items-center text-zinc-400">
+                <span className="text-zinc-500 font-sans">Payload Size:</span>
+                <span>{formatBytes(decryptModalFile.fileSize)}</span>
+              </div>
+              <div className="flex justify-between items-center text-zinc-400">
+                <span className="text-zinc-500 font-sans">Algorithm:</span>
+                <span className="text-cyan-400">AES-256-GCM (Authenticated)</span>
+              </div>
+            </div>
+
+            {/* Key Input Section */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-zinc-200">
+                  AES-256 Key (64 hex characters)
+                </label>
+                {decryptModalFile.keyHex && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setManualKeyInput(decryptModalFile.keyHex);
+                      setDecryptModalError(null);
+                    }}
+                    className="text-[11px] font-mono text-cyan-400 hover:text-cyan-300 flex items-center gap-1 underline underline-offset-2"
+                  >
+                    <span>Use Saved Vault Key</span>
+                  </button>
+                )}
+              </div>
+              <div className="relative">
+                <input
+                  type={showKeyInput ? "text" : "password"}
+                  value={manualKeyInput}
+                  onChange={(e) => {
+                    setManualKeyInput(e.target.value.trim());
+                    setDecryptModalError(null);
+                  }}
+                  placeholder="Paste 64-character hexadecimal AES key..."
+                  className="w-full rounded-lg border border-zinc-800 bg-zinc-950 py-2.5 pl-3 pr-10 text-xs font-mono text-zinc-100 placeholder:text-zinc-600 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowKeyInput(!showKeyInput)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-200"
+                >
+                  {showKeyInput ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between text-[11px] font-mono text-zinc-500">
+                <span>Key length: {manualKeyInput.length} / 64 hex characters</span>
+                {manualKeyInput.length === 64 && /^[0-9a-fA-F]{64}$/.test(manualKeyInput) ? (
+                  <span className="text-emerald-400 flex items-center gap-1 font-sans">
+                    <Check className="h-3 w-3" /> Valid 256-bit format
+                  </span>
+                ) : null}
+              </div>
+            </div>
+
+            {/* Error Message */}
+            {decryptModalError && (
+              <div className="flex items-start gap-2 p-3 rounded-lg border border-red-500/40 bg-red-950/20 text-xs text-red-400">
+                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                <span>{decryptModalError}</span>
+              </div>
+            )}
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-800">
+              <button
+                type="button"
+                onClick={handleCloseDecryptModal}
+                disabled={isDecryptingModal}
+                className="px-4 py-2 text-xs font-medium text-zinc-400 hover:text-zinc-200 rounded-lg hover:bg-zinc-800/50 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={manualKeyInput.length !== 64 || isDecryptingModal}
+                onClick={handleConfirmDecryptWithKey}
+                className="flex items-center gap-2 px-5 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-zinc-950 font-bold text-xs shadow-lg shadow-cyan-950/50 transition-all disabled:opacity-50 disabled:pointer-events-none"
+              >
+                {isDecryptingModal ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <span>Decrypting Payload...</span>
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-3.5 w-3.5" />
+                    <span>Unlock & Decrypt</span>
                   </>
                 )}
               </button>

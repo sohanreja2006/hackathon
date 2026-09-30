@@ -9,7 +9,7 @@
  * SECURITY:
  * - The plaintext file is read and encrypted locally via the Phase 3 crypto engine.
  * - ONLY the encrypted blob (.cyber10enc) is sent to the server.
- * - The AES key is shown once to the user and never sent anywhere.
+ * - The AES key is either protected by VaultX KEK (preferred) or shown once to the user.
  * - The server never receives plaintext.
  */
 
@@ -31,6 +31,7 @@ import {
   EyeOff,
   Info,
   Globe,
+  ShieldCheck,
 } from "lucide-react";
 import { encryptFile, formatBytes, type CryptoProgress } from "@/lib/crypto";
 import { getIpfsUrl } from "@/lib/ipfs/gateway";
@@ -38,6 +39,8 @@ import { cn } from "@/lib/utils";
 import type { VaultUploadStage, UploadApiResponse } from "@/types/files";
 import { useAccount } from "wagmi";
 import { saveUserFile } from "@/lib/fileStorage";
+import { useVaultXWallet } from "@/context/VaultXWalletContext";
+import { protectFileKeyWithVaultX } from "@/lib/vaultxWallet";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Stage metadata
@@ -223,14 +226,77 @@ function DropZone({
       </div>
       <div>
         <p className="text-sm font-medium text-zinc-300">Drop any file here, or click to browse</p>
-        <p className="mt-0.5 text-xs text-zinc-500">Max 50 MB · Any type · Will be encrypted before upload</p>
+        <p className="mt-0.5 text-xs text-zinc-500">Max 500 MB · Any type · Will be encrypted before upload</p>
       </div>
     </div>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Key display (shown once after encrypt, before upload)
+// VaultX-protected key badge (key is wrapped — no plaintext shown by default)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function VaultXKeyBadge({ vaultId, keyHex }: { vaultId: string; keyHex: string }) {
+  const [showFallback, setShowFallback] = useState(false);
+
+  return (
+    <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/10 p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <ShieldCheck className="h-4 w-4 text-emerald-400" />
+        <span className="text-xs font-semibold text-emerald-300 uppercase tracking-wider">
+          Key Protected by VaultX
+        </span>
+      </div>
+
+      <div className="flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-950/20 px-3 py-2">
+        <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+        <span className="font-mono text-xs text-emerald-300">{vaultId}</span>
+        <span className="ml-auto text-[10px] text-emerald-600 uppercase tracking-wider">Active KEK</span>
+      </div>
+
+      <p className="text-[11px] text-zinc-500 leading-relaxed">
+        Your file-encryption key has been wrapped by your VaultX master key and saved locally.{" "}
+        <strong className="text-zinc-400">No manual key copy needed</strong> — VaultX will unlock it
+        automatically when you retrieve this file.
+      </p>
+
+      <button
+        type="button"
+        onClick={() => setShowFallback((v) => !v)}
+        className="inline-flex items-center gap-1 text-[10px] text-zinc-600 hover:text-zinc-400 underline transition-colors"
+      >
+        {showFallback ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+        {showFallback ? "Hide" : "Show"} raw backup key
+      </button>
+
+      {showFallback && (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-950/20 p-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <Key className="h-3.5 w-3.5 text-amber-400" />
+              <span className="text-[10px] font-semibold text-amber-300 uppercase tracking-wider">
+                Raw AES-256 Backup Key
+              </span>
+            </div>
+            <CopyButton text={keyHex} label="Copy Key" />
+          </div>
+          <p className="break-all font-mono text-[10px] text-amber-200 leading-relaxed bg-amber-950/30 rounded-lg border border-amber-500/20 p-2">
+            {keyHex}
+          </p>
+          <div className="flex items-start gap-2 rounded-lg border border-red-500/20 bg-red-950/20 px-3 py-2">
+            <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-red-400" />
+            <p className="text-[10px] text-red-300 leading-relaxed">
+              Store this only if you plan to access this file without VaultX on a different device.
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Key display — shown once after encrypt when VaultX is NOT active
 // ─────────────────────────────────────────────────────────────────────────────
 
 function KeySaveBox({ keyHex }: { keyHex: string }) {
@@ -267,7 +333,10 @@ function KeySaveBox({ keyHex }: { keyHex: string }) {
         <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-400" />
         <p className="text-[11px] text-red-300 leading-relaxed">
           <strong>This key is shown exactly once.</strong> CYBER-10 does not store it.
-          Without this key, your file cannot be decrypted — not even from IPFS.
+          Without this key, your file cannot be decrypted — not even from IPFS.{" "}
+          <span className="text-amber-300 font-medium">
+            Connect VaultX Secure Wallet to manage keys automatically.
+          </span>
         </p>
       </div>
     </div>
@@ -346,10 +415,17 @@ function CidDisplay({ cid, uploadedAt, size }: { cid: string; uploadedAt: string
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function VaultUploadPanel() {
-  const { address } = useAccount();
+  const { address, isConnected } = useAccount();
+  const { isConnected: isVaultXConnected, identity: vaultXIdentity } = useVaultXWallet();
+
+  // If MetaMask is connected, MetaMask is active and we do NOT use VaultX
+  const isMetaMaskActive = Boolean(address && isConnected);
+  const isVaultXActive = !isMetaMaskActive && isVaultXConnected;
+
   const [stage, setStage] = useState<VaultUploadStage>("idle");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [keyHex, setKeyHex] = useState<string | null>(null);
+  const [keyProtectedByVaultX, setKeyProtectedByVaultX] = useState(false);
   const [encryptedBlob, setEncryptedBlob] = useState<Blob | null>(null);
   const [encryptedSize, setEncryptedSize] = useState<number>(0);
   const [cid, setCid] = useState<string | null>(null);
@@ -365,6 +441,7 @@ export function VaultUploadPanel() {
     setStage("idle");
     setSelectedFile(null);
     setKeyHex(null);
+    setKeyProtectedByVaultX(false);
     setEncryptedBlob(null);
     setEncryptedSize(0);
     setCid(null);
@@ -402,6 +479,20 @@ export function VaultUploadPanel() {
       return;
     }
 
+    // ── Phase 1b: Wrap DEK with VaultX KEK ONLY if VaultX is active (NOT when MetaMask is connected) ──
+    let wrappedKey: string | undefined;
+    if (isVaultXActive) {
+      try {
+        wrappedKey = await protectFileKeyWithVaultX(bundle.keyHex);
+        setKeyProtectedByVaultX(true);
+      } catch (wrapErr) {
+        console.warn("VaultX key wrapping failed, falling back to raw key display", wrapErr);
+        setKeyProtectedByVaultX(false);
+      }
+    } else {
+      setKeyProtectedByVaultX(false);
+    }
+
     setKeyHex(bundle.keyHex);
     setEncryptedBlob(bundle.encryptedBlob);
     setEncryptedSize(bundle.encryptedSizeBytes);
@@ -411,65 +502,132 @@ export function VaultUploadPanel() {
     // Brief pause so the user sees the "ENCRYPTED" state
     await new Promise((r) => setTimeout(r, 600));
 
-    // ── Phase 2: Upload ciphertext to server → Pinata ────────────────────────
+    // ── Phase 2: Direct-to-Pinata upload using signed URL (supports up to 500 MB) ──
     setStage("uploading");
-    setStatusMessage("Uploading encrypted data to IPFS...");
+    setStatusMessage("Obtaining secure upload authorization...");
 
-    const formData = new FormData();
-    // CRITICAL: only the encrypted blob is sent — not the plaintext file
-    formData.append("encryptedFile", bundle.encryptedBlob, bundle.downloadName);
-    formData.append("originalName", selectedFile.name);
-    formData.append("originalMime", selectedFile.type || "application/octet-stream");
-    formData.append("originalSize", String(selectedFile.size));
+    let finalCid: string | null = null;
+    let finalSize: number = bundle.encryptedSizeBytes;
+    let finalUploadedAt: string = new Date().toISOString();
 
-    let apiResponse: UploadApiResponse;
     try {
-      const res = await fetch("/api/files/upload", {
+      // 1. Request presigned upload URL from our Next.js backend (minimal metadata, < 1 KB)
+      const urlRes = await fetch("/api/files/upload-url", {
         method: "POST",
-        // Note: no Content-Type header — browser sets multipart boundary automatically
-        body: formData,
+        headers: {
+          "Content-Type": "application/json",
+          ...(isVaultXActive && vaultXIdentity?.id ? { "x-vaultx-id": vaultXIdentity.id } : {}),
+        },
+        body: JSON.stringify({
+          filename: bundle.downloadName,
+          vaultXId: isVaultXActive ? vaultXIdentity?.id : undefined,
+        }),
       });
-      apiResponse = await res.json();
-    } catch (networkErr: unknown) {
-      const msg = networkErr instanceof Error ? networkErr.message : "Network error";
-      setErrorMessage(`Upload failed. Could not reach the server: ${msg}`);
-      setStage("error");
-      return;
-    }
 
-    if (!apiResponse.success) {
-      setErrorMessage(apiResponse.error || "Upload failed. Your encrypted file was not stored.");
-      setStage("error");
-      return;
+      if (!urlRes.ok) {
+        const errJson = await urlRes.json().catch(() => null);
+        throw new Error(errJson?.error || "Could not acquire direct upload credentials.");
+      }
+
+      const { uploadUrl } = await urlRes.json();
+      if (!uploadUrl) {
+        throw new Error("No upload URL returned.");
+      }
+
+      setStatusMessage("Uploading ciphertext directly to IPFS (bypassing server limits)...");
+
+      // 2. Upload encrypted blob directly to Pinata edge
+      const pinataForm = new FormData();
+      pinataForm.append("file", bundle.encryptedBlob, bundle.downloadName);
+
+      const pinataRes = await fetch(uploadUrl, {
+        method: "POST",
+        body: pinataForm,
+      });
+
+      if (!pinataRes.ok) {
+        const errText = await pinataRes.text();
+        throw new Error(`Direct upload failed (${pinataRes.status}): ${errText.slice(0, 100)}`);
+      }
+
+      const pinataData = await pinataRes.json();
+      finalCid = pinataData?.data?.cid;
+      finalSize = pinataData?.data?.size || bundle.encryptedSizeBytes;
+      finalUploadedAt = pinataData?.data?.created_at || new Date().toISOString();
+
+      if (!finalCid) {
+        throw new Error("Pinata direct upload did not return a CID.");
+      }
+    } catch (directErr: unknown) {
+      console.warn("Direct upload fallback to server proxy", directErr);
+      setStatusMessage("Routing upload via secure server proxy...");
+
+      const formData = new FormData();
+      formData.append("encryptedFile", bundle.encryptedBlob, bundle.downloadName);
+      formData.append("originalName", selectedFile.name);
+      formData.append("originalMime", selectedFile.type || "application/octet-stream");
+      formData.append("originalSize", String(selectedFile.size));
+      if (isVaultXActive && vaultXIdentity?.id) {
+        formData.append("vaultXId", vaultXIdentity.id);
+      }
+
+      let apiResponse: UploadApiResponse;
+      try {
+        const res = await fetch("/api/files/upload", {
+          method: "POST",
+          headers: {
+            ...(isVaultXActive && vaultXIdentity?.id ? { "x-vaultx-id": vaultXIdentity.id } : {}),
+          },
+          body: formData,
+        });
+        apiResponse = await res.json();
+      } catch (networkErr: unknown) {
+        const msg = networkErr instanceof Error ? networkErr.message : "Network error";
+        setErrorMessage(`Upload failed. Could not reach the server: ${msg}`);
+        setStage("error");
+        return;
+      }
+
+      if (!apiResponse.success) {
+        setErrorMessage(apiResponse.error || "Upload failed. Your encrypted file was not stored.");
+        setStage("error");
+        return;
+      }
+
+      finalCid = apiResponse.cid;
+      finalSize = apiResponse.size;
+      finalUploadedAt = apiResponse.uploadedAt;
     }
 
     // ── Success ──────────────────────────────────────────────────────────────
-    setCid(apiResponse.cid);
-    setUploadedAt(apiResponse.uploadedAt);
-    setUploadedSize(apiResponse.size);
+    setCid(finalCid);
+    setUploadedAt(finalUploadedAt);
+    setUploadedSize(finalSize);
     setStage("uploaded");
     setStatusMessage("Successfully uploaded to IPFS.");
     setCryptoProgress(null);
 
-    // Auto-save to Decentralized File Directory (FR-4)
-    if (address && bundle.keyHex) {
+    // Auto-save to Decentralized File Directory (FR-4) — include wrappedKey only if VaultX is active
+    const ownerKey = address?.toLowerCase() ?? (isVaultXActive ? vaultXIdentity?.id : "anonymous");
+    if (ownerKey && bundle.keyHex) {
       const ext = selectedFile.name.split(".").pop()?.toUpperCase() || "BIN";
       saveUserFile({
         id: `cyber-${Date.now()}`,
-        cid: apiResponse.cid,
+        cid: finalCid!,
         fileName: selectedFile.name,
         originalName: selectedFile.name,
         extension: ext,
         fileSize: selectedFile.size,
         mimeType: selectedFile.type || "application/octet-stream",
-        uploadedAt: apiResponse.uploadedAt || new Date().toISOString(),
-        ownerAddress: address.toLowerCase(),
+        uploadedAt: finalUploadedAt || new Date().toISOString(),
+        ownerAddress: ownerKey,
         keyHex: bundle.keyHex,
+        wrappedKey: isVaultXActive ? wrappedKey : undefined,
         algorithm: "AES-256-GCM",
         sharedWith: [],
       });
     }
-  }, [selectedFile, address]);
+  }, [selectedFile, address, isConnected, isVaultXActive, vaultXIdentity]);
 
   return (
     <div className="space-y-5">
@@ -491,6 +649,11 @@ export function VaultUploadPanel() {
             <span className="text-cyan-300 font-medium">Zero-knowledge upload.</span>{" "}
             Files are encrypted in your browser with AES-256-GCM before upload.
             Only ciphertext reaches the server — your plaintext and key never leave your device.
+            {isVaultXActive && (
+              <span className="ml-1 inline-flex items-center gap-1 text-emerald-400 font-medium">
+                <ShieldCheck className="h-3 w-3" /> VaultX will protect your key automatically.
+              </span>
+            )}
           </div>
         </div>
       )}
@@ -525,9 +688,13 @@ export function VaultUploadPanel() {
         </div>
       )}
 
-      {/* Key display — shown after encryption, before and after upload */}
+      {/* Key display — VaultX-protected badge ONLY if VaultX is active, otherwise standard KeySaveBox */}
       {keyHex && (stage === "encrypted" || stage === "uploading" || stage === "uploaded") && (
-        <KeySaveBox keyHex={keyHex} />
+        isVaultXActive && keyProtectedByVaultX && vaultXIdentity ? (
+          <VaultXKeyBadge vaultId={vaultXIdentity.id} keyHex={keyHex} />
+        ) : (
+          <KeySaveBox keyHex={keyHex} />
+        )
       )}
 
       {/* Error */}

@@ -368,7 +368,7 @@ function EncryptPanel() {
           {/* Key Display */}
           <KeyDisplay keyHex={bundle.keyHex} />
 
-          {/* Download Buttons */}
+          {/* Download & Vault Upload Actions */}
           <div className="flex flex-col sm:flex-row gap-2 pt-1">
             <button
               type="button"
@@ -379,13 +379,20 @@ function EncryptPanel() {
               <Download className="h-4 w-4" />
               Download Encrypted File
             </button>
+            <a
+              href="/dashboard/vault"
+              className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 via-violet-500 to-fuchsia-500 py-2.5 text-sm font-semibold text-white hover:brightness-110 shadow-lg shadow-violet-500/20 transition-all duration-200"
+            >
+              <Upload className="h-4 w-4" />
+              Upload to IPFS Vault →
+            </a>
             <button
               type="button"
               onClick={reset}
               className="flex items-center justify-center gap-2 rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-2.5 text-sm text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors"
             >
               <RefreshCw className="h-4 w-4" />
-              Encrypt Another
+              Reset
             </button>
           </div>
         </div>
@@ -415,7 +422,8 @@ function DecryptPanel() {
         setOpState({ status: "processing", progress: p, errorMessage: null });
       });
       setResult({ blob: decrypted.plainBlob, name: decrypted.originalName });
-      setOpState({ status: "success", progress: { stage: "done", message: "Decryption complete." }, errorMessage: null });
+      setOpState({ status: "success", progress: { stage: "done", message: "Decryption complete. Downloading file..." }, errorMessage: null });
+      downloadBlob(decrypted.plainBlob, decrypted.originalName);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Decryption failed.";
       setOpState({ status: "error", progress: { stage: "error", message: msg }, errorMessage: msg });
@@ -499,6 +507,19 @@ function DecryptPanel() {
         </div>
       </div>
 
+      {/* File required helper text */}
+      {!file && keyInput.trim().length === 64 && (
+        <div className="flex items-center justify-between rounded-lg border border-amber-500/30 bg-amber-950/20 px-3.5 py-2.5 text-xs text-amber-300">
+          <span>⚠️ <strong>Step 1 required:</strong> Click or drop your <code>.cyber10enc</code> file into box #1 above.</span>
+          <a
+            href="/dashboard/vault"
+            className="ml-3 shrink-0 underline text-cyan-400 hover:text-cyan-300 font-medium"
+          >
+            Or decrypt from IPFS in Vault →
+          </a>
+        </div>
+      )}
+
       {/* Decrypt Button */}
       {opState.status !== "success" && (
         <button
@@ -518,7 +539,13 @@ function DecryptPanel() {
           ) : (
             <Unlock className="h-4 w-4" />
           )}
-          {opState.status === "processing" ? "Decrypting…" : "Decrypt File"}
+          {opState.status === "processing"
+            ? "Decrypting…"
+            : !file
+            ? "Select a .cyber10enc file to decrypt"
+            : keyInput.trim().length !== 64
+            ? "Enter 64-character hex key"
+            : "Decrypt File"}
         </button>
       )}
 
@@ -587,7 +614,7 @@ export function FileEncryptionPanel() {
   const [mode, setMode] = useState<Mode>("encrypt");
 
   return (
-    <div className="w-full max-w-2xl mx-auto">
+    <div className="panel-max-w w-full max-w-2xl mx-auto">
       {/* Mode Toggle */}
       <div className="mb-6 flex rounded-xl border border-zinc-800 bg-zinc-900 p-1">
         {(["encrypt", "decrypt"] as Mode[]).map((m) => (
@@ -611,9 +638,14 @@ export function FileEncryptionPanel() {
         ))}
       </div>
 
-      {/* Panel Content */}
+      {/* Panel Content — both panels always mounted to preserve state on tab switch */}
       <div className="rounded-2xl border border-zinc-800 bg-zinc-950/80 backdrop-blur-xl p-6">
-        {mode === "encrypt" ? <EncryptPanel /> : <DecryptPanel />}
+        <div className={mode === "encrypt" ? "block" : "hidden"}>
+          <EncryptPanel />
+        </div>
+        <div className={mode === "decrypt" ? "block" : "hidden"}>
+          <DecryptPanel />
+        </div>
       </div>
     </div>
   );

@@ -14,7 +14,7 @@
  */
 
 export const PINATA_UPLOAD_URL = "https://uploads.pinata.cloud/v3/files";
-export const MAX_ENCRYPTED_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB
+export const MAX_ENCRYPTED_SIZE_BYTES = 500 * 1024 * 1024; // 500 MB
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -121,6 +121,7 @@ export async function uploadEncryptedFileToPinata(
     },
   };
   form.append("name", metadata.name);
+  form.append("network", "public");
   form.append("keyvalues", JSON.stringify(metadata.keyvalues));
 
   // Upload to Pinata Files API v3
@@ -174,21 +175,37 @@ export async function uploadEncryptedFileToPinata(
 }
 
 /**
- * Verify that the Pinata JWT is configured and the API is reachable.
- * Used in health-check contexts — does NOT upload anything.
+ * Generate a pre-signed Pinata upload URL.
+ * Allows client browsers to upload encrypted files directly to Pinata,
+ * completely bypassing Vercel's 4.5 MB serverless payload limits and supporting up to 500 MB.
  */
-export async function pingPinata(): Promise<{ ok: boolean; error?: string }> {
-  try {
-    const jwt = getPinataJwt();
-    const res = await fetch("https://api.pinata.cloud/v3/files?pageLimit=1", {
-      method: "GET",
-      headers: { Authorization: `Bearer ${jwt}` },
-    });
-    return { ok: res.ok };
-  } catch (err: unknown) {
-    return {
-      ok: false,
-      error: err instanceof Error ? err.message : "Unknown error",
-    };
+export async function createPinataSignedUploadUrl(name: string, expiresSeconds = 300): Promise<string> {
+  const jwt = getPinataJwt();
+  const date = Math.floor(Date.now() / 1000);
+
+  const res = await fetch("https://uploads.pinata.cloud/v3/files/sign", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${jwt}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      network: "public",
+      expires: expiresSeconds,
+      name,
+      date,
+    }),
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(`Failed to generate signed upload URL (${res.status}): ${errorText}`);
   }
+
+  const json = await res.json();
+  if (!json?.data) {
+    throw new Error("Invalid response from Pinata signed URL service.");
+  }
+
+  return json.data as string;
 }

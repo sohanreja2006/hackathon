@@ -23,6 +23,11 @@ export interface StoredEncryptedFile {
   uploadedAt: string;
   ownerAddress: string;
   keyHex: string;
+  /**
+   * AES-GCM wrapped copy of keyHex encrypted by the VaultX master KEK.
+   * Format: "<iv-hex>:<ciphertext-hex>"  (set only when VaultX wallet was active at upload time)
+   */
+  wrappedKey?: string;
   algorithm: "AES-256-GCM";
   sharedWith: string[]; // List of recipient addresses
 }
@@ -56,6 +61,61 @@ export function getUserFiles(walletAddress?: string | null): StoredEncryptedFile
     return JSON.parse(raw) as StoredEncryptedFile[];
   } catch (err) {
     console.error("Failed to read user files from localStorage", err);
+    return [];
+  }
+}
+
+/**
+ * Retrieve all files stored in this browser session.
+ * Checks known owners (MetaMask address, VaultX identity, etc.) AND
+ * scans all localStorage keys matching STORAGE_KEY_PREFIX.
+ * This guarantees that files uploaded under VaultX or MetaMask NEVER vanish
+ * from recent files history when switching or navigating.
+ */
+export function getAllVaultFiles(knownOwners?: (string | null | undefined)[]): StoredEncryptedFile[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const fileMap = new Map<string, StoredEncryptedFile>();
+
+    // 1. Check known owner keys explicitly
+    const cleanOwners = (knownOwners || []).filter(Boolean) as string[];
+    for (const owner of cleanOwners) {
+      const files = getUserFiles(owner);
+      for (const f of files) {
+        if (f.cid) fileMap.set(f.cid, f);
+      }
+    }
+
+    // 2. Scan all localStorage keys with prefix
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(STORAGE_KEY_PREFIX)) {
+        try {
+          const raw = localStorage.getItem(key);
+          if (raw) {
+            const parsed = JSON.parse(raw) as StoredEncryptedFile[];
+            if (Array.isArray(parsed)) {
+              for (const f of parsed) {
+                if (f.cid && !fileMap.has(f.cid)) {
+                  fileMap.set(f.cid, f);
+                }
+              }
+            }
+          }
+        } catch {
+          // ignore parse errors
+        }
+      }
+    }
+
+    // Return sorted newest first
+    return Array.from(fileMap.values()).sort((a, b) => {
+      const timeA = new Date(a.uploadedAt || 0).getTime();
+      const timeB = new Date(b.uploadedAt || 0).getTime();
+      return timeB - timeA;
+    });
+  } catch (err) {
+    console.error("Failed to retrieve vault files", err);
     return [];
   }
 }

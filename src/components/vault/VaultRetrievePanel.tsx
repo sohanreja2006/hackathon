@@ -13,7 +13,7 @@
  * - The server never decrypts anything.
  */
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Download,
   Globe,
@@ -25,14 +25,22 @@ import {
   EyeOff,
   Info,
   FileText,
+  ShieldCheck,
 } from "lucide-react";
 import { decryptFile, downloadBlob, formatBytes } from "@/lib/crypto";
 import { fetchFromIpfs, getIpfsUrl, isValidCid, getGatewayBase } from "@/lib/ipfs/gateway";
 import { cn } from "@/lib/utils";
+import { useVaultXWallet } from "@/context/VaultXWalletContext";
+import { unlockFileKeyWithVaultX } from "@/lib/vaultxWallet";
+import { getUserFiles } from "@/lib/fileStorage";
+import { useAccount } from "wagmi";
 
 type RetrieveStage = "idle" | "fetching" | "decrypting" | "done" | "error";
 
 export function VaultRetrievePanel() {
+  const { address } = useAccount();
+  const { isConnected: isVaultXConnected, identity: vaultXIdentity } = useVaultXWallet();
+
   const [cidInput, setCidInput] = useState("");
   const [keyInput, setKeyInput] = useState("");
   const [showKey, setShowKey] = useState(false);
@@ -40,6 +48,35 @@ export function VaultRetrievePanel() {
   const [statusMessage, setStatusMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [result, setResult] = useState<{ blob: Blob; name: string; size: number } | null>(null);
+  const [savedVaultKey, setSavedVaultKey] = useState<string | null>(null);
+
+  // When CID changes, check if there is a saved key available (NEVER auto-fill keyInput)
+  useEffect(() => {
+    setSavedVaultKey(null);
+    const cid = cidInput.trim();
+    if (!isValidCid(cid)) return;
+
+    let cancelled = false;
+    const ownerKey = address?.toLowerCase() ?? vaultXIdentity?.id ?? "";
+    if (!ownerKey) return;
+
+    const files = getUserFiles(ownerKey);
+    const match = files.find((f) => f.cid === cid);
+
+    if (match?.wrappedKey && isVaultXConnected) {
+      unlockFileKeyWithVaultX(match.wrappedKey)
+        .then((plainKey) => {
+          if (!cancelled) {
+            setSavedVaultKey(plainKey);
+          }
+        })
+        .catch(() => {});
+    } else if (match?.keyHex) {
+      setSavedVaultKey(match.keyHex);
+    }
+
+    return () => { cancelled = true; };
+  }, [cidInput, isVaultXConnected, address, vaultXIdentity]);
 
   const cidValid = isValidCid(cidInput.trim());
   const keyValid = keyInput.trim().length === 64;
@@ -120,6 +157,28 @@ export function VaultRetrievePanel() {
         </div>
       </div>
 
+      {/* Optional notice if saved key is available in user's vault */}
+      {savedVaultKey && cidValid && (
+        <div className="flex items-center justify-between rounded-xl border border-cyan-500/20 bg-cyan-950/20 px-4 py-2.5">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 shrink-0 text-cyan-400" />
+            <p className="text-xs text-zinc-300">
+              Saved vault key found for this CID.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setKeyInput(savedVaultKey);
+              reset();
+            }}
+            className="text-xs font-mono text-cyan-400 hover:text-cyan-300 underline transition-colors"
+          >
+            Autofill Key
+          </button>
+        </div>
+      )}
+
       {/* CID input */}
       <div>
         <div className="mb-2 flex items-center justify-between">
@@ -163,25 +222,39 @@ export function VaultRetrievePanel() {
         )}
       </div>
 
-      {/* Key input */}
+      {/* Key input — manual entry */}
       <div>
         <div className="mb-2 flex items-center justify-between">
           <label htmlFor="retrieve-key-input" className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
             2. AES-256 Decryption Key
           </label>
-          <span className={cn(
-            "text-[10px] font-mono",
-            keyInput.length === 64 ? "text-emerald-400" : keyInput.length > 0 ? "text-amber-400" : "text-zinc-600"
-          )}>
-            {keyInput.length}/64
-          </span>
+          <div className="flex items-center gap-3">
+            {savedVaultKey && keyInput !== savedVaultKey && (
+              <button
+                type="button"
+                onClick={() => {
+                  setKeyInput(savedVaultKey);
+                  reset();
+                }}
+                className="text-[11px] font-mono text-cyan-400 hover:text-cyan-300 underline transition-colors"
+              >
+                Use Saved Vault Key
+              </button>
+            )}
+            <span className={cn(
+              "text-[10px] font-mono",
+              keyInput.length === 64 ? "text-emerald-400" : keyInput.length > 0 ? "text-amber-400" : "text-zinc-600"
+            )}>
+              {keyInput.length}/64
+            </span>
+          </div>
         </div>
         <div className="relative">
           <input
             id="retrieve-key-input"
             type={showKey ? "text" : "password"}
             value={keyInput}
-            onChange={(e) => { setKeyInput(e.target.value); reset(); }}
+            onChange={(e) => { setKeyInput(e.target.value.trim()); reset(); }}
             placeholder="Paste 64-character hex key..."
             spellCheck={false}
             autoComplete="off"

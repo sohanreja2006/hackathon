@@ -12,7 +12,7 @@ export function VaultTabs() {
   const [activeTab, setActiveTab] = useState<Tab>("upload");
 
   return (
-    <div className="w-full max-w-2xl mx-auto">
+    <div className="panel-max-w w-full max-w-2xl mx-auto">
       {/* Tab switcher */}
       <div className="mb-6 flex rounded-xl border border-zinc-800 bg-zinc-900 p-1">
         {(["upload", "retrieve"] as Tab[]).map((tab) => (
@@ -40,9 +40,14 @@ export function VaultTabs() {
         ))}
       </div>
 
-      {/* Panel content */}
+      {/* Panel content — always mounted to preserve state on tab switch */}
       <div className="rounded-2xl border border-zinc-800 bg-zinc-950/80 backdrop-blur-xl p-6">
-        {activeTab === "upload" ? <VaultUploadPanel /> : <VaultRetrievePanel />}
+        <div className={activeTab === "upload" ? "block" : "hidden"}>
+          <VaultUploadPanel />
+        </div>
+        <div className={activeTab === "retrieve" ? "block" : "hidden"}>
+          <VaultRetrievePanel />
+        </div>
       </div>
     </div>
   );

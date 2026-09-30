@@ -31,7 +31,7 @@ export default function DashboardPage() {
         <DashboardStats />
 
         {/* Action Banner — Phase 3 Live */}
-        <div className="mb-8 rounded-xl border border-cyan-500/20 bg-gradient-to-r from-cyan-950/30 via-zinc-900/60 to-zinc-900/40 p-5 backdrop-blur-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="action-banner mb-8 rounded-xl border border-cyan-500/20 bg-gradient-to-r from-cyan-950/30 via-zinc-900/60 to-zinc-900/40 p-5 backdrop-blur-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
@@ -49,7 +49,7 @@ export default function DashboardPage() {
 
           <Link
             href="/dashboard/encrypt"
-            className="inline-flex items-center justify-center gap-1.5 h-8 rounded-md px-3 text-xs relative overflow-hidden bg-gradient-to-r from-cyan-600 via-cyan-500 to-emerald-500 text-zinc-950 font-semibold hover:brightness-110 active:scale-[0.98] shadow-md shadow-cyan-950/40 border border-cyan-400/30 shrink-0 transition-all duration-200"
+            className="action-banner-btn inline-flex items-center justify-center gap-1.5 h-8 rounded-md px-3 text-xs relative overflow-hidden bg-gradient-to-r from-cyan-600 via-cyan-500 to-emerald-500 text-zinc-950 font-semibold hover:brightness-110 active:scale-[0.98] shadow-md shadow-cyan-950/40 border border-cyan-400/30 shrink-0 transition-all duration-200"
           >
             <Plus className="h-3.5 w-3.5" />
             <span>Encrypt a File</span>
@@ -57,7 +57,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Action Banner — Phase 4 Live: Encrypted IPFS Vault */}
-        <div className="mb-8 rounded-xl border border-violet-500/20 bg-gradient-to-r from-violet-950/30 via-zinc-900/60 to-zinc-900/40 p-5 backdrop-blur-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="action-banner mb-8 rounded-xl border border-violet-500/20 bg-gradient-to-r from-violet-950/30 via-zinc-900/60 to-zinc-900/40 p-5 backdrop-blur-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
@@ -75,7 +75,7 @@ export default function DashboardPage() {
 
           <Link
             href="/dashboard/vault"
-            className="inline-flex items-center justify-center gap-1.5 h-8 rounded-md px-3 text-xs relative overflow-hidden bg-gradient-to-r from-violet-600 via-violet-500 to-fuchsia-500 text-white font-semibold hover:brightness-110 active:scale-[0.98] shadow-md shadow-violet-950/40 border border-violet-400/30 shrink-0 transition-all duration-200"
+            className="action-banner-btn inline-flex items-center justify-center gap-1.5 h-8 rounded-md px-3 text-xs relative overflow-hidden bg-gradient-to-r from-violet-600 via-violet-500 to-fuchsia-500 text-white font-semibold hover:brightness-110 active:scale-[0.98] shadow-md shadow-violet-950/40 border border-violet-400/30 shrink-0 transition-all duration-200"
           >
             <Plus className="h-3.5 w-3.5" />
             <span>Open Vault</span>

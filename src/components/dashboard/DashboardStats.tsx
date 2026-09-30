@@ -4,32 +4,39 @@ import React, { useEffect, useState } from "react";
 import { FileBox, Lock, HardDrive, Share2 } from "lucide-react";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { useAccount } from "wagmi";
-import { getUserFiles, getSharedWithMeFiles } from "@/lib/fileStorage";
+import { useVaultXWallet } from "@/context/VaultXWalletContext";
+import { getAllVaultFiles, getSharedWithMeFiles } from "@/lib/fileStorage";
 import { formatBytes } from "@/lib/crypto";
 
 export function DashboardStats() {
   const { address } = useAccount();
+  const { identity: vaultXIdentity } = useVaultXWallet();
+
   const [totalFiles, setTotalFiles] = useState(0);
   const [totalBytes, setTotalBytes] = useState(0);
   const [sharedCount, setSharedCount] = useState(0);
 
   useEffect(() => {
-    if (address) {
-      const files = getUserFiles(address);
-      const shared = getSharedWithMeFiles(address);
+    const updateStats = () => {
+      const files = getAllVaultFiles([address, vaultXIdentity?.id]);
+      const shared = address ? getSharedWithMeFiles(address) : [];
       setTotalFiles(files.length);
       const bytes = files.reduce((acc, f) => acc + (f.fileSize || 0), 0);
       setTotalBytes(bytes);
       setSharedCount(shared.length);
-    } else {
-      setTotalFiles(0);
-      setTotalBytes(0);
-      setSharedCount(0);
-    }
-  }, [address]);
+    };
+
+    updateStats();
+    window.addEventListener("focus", updateStats);
+    window.addEventListener("storage", updateStats);
+    return () => {
+      window.removeEventListener("focus", updateStats);
+      window.removeEventListener("storage", updateStats);
+    };
+  }, [address, vaultXIdentity]);
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    <div className="stat-cards-grid grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
       <StatCard
         title="My Vault Files"
         value={totalFiles}

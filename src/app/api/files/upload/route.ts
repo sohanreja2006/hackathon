@@ -30,16 +30,7 @@ import type { UploadApiResponse } from "@/types/files";
  * Response 500: { success: false, error: "Upload failed." }
  */
 export async function POST(req: NextRequest): Promise<NextResponse<UploadApiResponse>> {
-  // ── 1. Authenticate ────────────────────────────────────────────────────────
-  const wallet = await getAuthenticatedWallet();
-  if (!wallet) {
-    return NextResponse.json(
-      { success: false, error: "Unauthorized. Please sign in with your wallet first." },
-      { status: 401 }
-    );
-  }
-
-  // ── 2. Parse multipart body ────────────────────────────────────────────────
+  // ── 1. Parse multipart body & check credentials ───────────────────────────
   let formData: FormData;
   try {
     formData = await req.formData();
@@ -49,6 +40,21 @@ export async function POST(req: NextRequest): Promise<NextResponse<UploadApiResp
       { status: 400 }
     );
   }
+
+  const wallet = await getAuthenticatedWallet();
+  const vaultXHeader = req.headers.get("x-vaultx-id") || req.headers.get("x-vaultx-identity");
+  const vaultXForm = (formData.get("vaultXId") as string | null)?.trim();
+  const vaultXId = vaultXHeader || vaultXForm;
+  const isVaultXValid = typeof vaultXId === "string" && /^VX-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}$/i.test(vaultXId.trim());
+
+  if (!wallet && !isVaultXValid) {
+    return NextResponse.json(
+      { success: false, error: "Unauthorized. Please connect MetaMask or VaultX Secure Wallet." },
+      { status: 401 }
+    );
+  }
+
+  const ownerAddress = wallet?.address || vaultXId!;
 
   const encryptedFileEntry = formData.get("encryptedFile");
   const originalName = (formData.get("originalName") as string | null)?.trim() || "unknown";
@@ -77,7 +83,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<UploadApiResp
     return NextResponse.json(
       {
         success: false,
-        error: `File too large. Maximum encrypted size is 50 MB. Received: ${(encryptedBuffer.byteLength / 1024 / 1024).toFixed(2)} MB.`,
+        error: `File too large. Maximum encrypted size is 500 MB. Received: ${(encryptedBuffer.byteLength / 1024 / 1024).toFixed(2)} MB.`,
       },
       { status: 413 }
     );
@@ -106,7 +112,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<UploadApiResp
       originalName,
       originalMimeType: originalMime,
       originalSizeBytes: isNaN(originalSize) ? 0 : originalSize,
-      ownerAddress: wallet.address,
+      ownerAddress,
     });
 
     return NextResponse.json({
