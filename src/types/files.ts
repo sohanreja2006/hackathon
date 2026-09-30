@@ -83,6 +83,8 @@ export type VaultUploadStage =
   | "encrypting"
   | "encrypted"
   | "uploading"
+  | "paused"
+  | "verifying"
   | "uploaded"
   | "error";
 

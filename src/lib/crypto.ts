@@ -43,6 +43,10 @@ export interface EncryptedFileBundle {
   encryptedAt: string;
   /** Suggested download filename */
   downloadName: string;
+  /** Hex-encoded initialization vector */
+  ivHex: string;
+  /** SHA-256 integrity hash of the encrypted bundle */
+  sha256Hex: string;
 }
 
 export interface DecryptedFileBundle {
@@ -252,6 +256,15 @@ export async function encryptFile(
 
   const encryptedBlob = new Blob([bundle], { type: "application/octet-stream" });
 
+  const ivHex = Array.from(iv)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+
+  const hashBuffer = await crypto.subtle.digest("SHA-256", bundle);
+  const sha256Hex = Array.from(new Uint8Array(hashBuffer))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+
   onProgress?.({ stage: "done", message: "Encryption complete." });
 
   return {
@@ -263,6 +276,8 @@ export async function encryptFile(
     encryptedSizeBytes: bundle.byteLength,
     encryptedAt: new Date().toISOString(),
     downloadName,
+    ivHex,
+    sha256Hex,
   };
 }
 

@@ -30,6 +30,12 @@ export interface StoredEncryptedFile {
   wrappedKey?: string;
   algorithm: "AES-256-GCM";
   sharedWith: string[]; // List of recipient addresses
+  totalChunks?: number;
+  chunkSize?: number;
+  manifestCID?: string;
+  logicalPath?: string;
+  uploadStatus?: string;
+  integrityStatus?: string;
 }
 
 export interface SharedFileRecord {

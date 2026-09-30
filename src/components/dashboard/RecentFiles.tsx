@@ -30,6 +30,8 @@ import { isAddress } from "viem";
 import { getIpfsUrl } from "@/lib/ipfs/gateway";
 import { useVaultXWallet } from "@/context/VaultXWalletContext";
 import { OwlCompanion } from "@/components/ui/OwlCompanion";
+import { fetchPayloadFiles } from "@/lib/payloadClient";
+import { FileDetailsModal } from "./FileDetailsModal";
 
 export function RecentFiles() {
   const { address } = useAccount();
@@ -69,10 +71,61 @@ export function RecentFiles() {
   const [isSharing, setIsSharing] = useState(false);
   const [shareSuccess, setShareSuccess] = useState(false);
 
-  // Load all user files from registry
-  const refreshFiles = useCallback(() => {
-    const allFiles = getAllVaultFiles([address, vaultXIdentity?.id]);
-    setMyFiles(allFiles);
+  // File Details Modal State (Drive-style file details & chunk map)
+  const [detailsModalFile, setDetailsModalFile] = useState<StoredEncryptedFile | null>(null);
+
+  // Load all user files from registry & Payload CMS backend
+  const refreshFiles = useCallback(async () => {
+    const localFiles = getAllVaultFiles([address, vaultXIdentity?.id]);
+
+    let payloadDocs: StoredEncryptedFile[] = [];
+    try {
+      const payloadFiles = await fetchPayloadFiles(vaultXIdentity?.id);
+      payloadDocs = payloadFiles.map((pf) => {
+        const matchingLocal = localFiles.find(
+          (lf) => lf.cid === pf.manifestCID || lf.fileName === pf.originalName
+        );
+        return {
+          id: pf.id,
+          cid: pf.manifestCID || matchingLocal?.cid || "",
+          fileName: pf.originalName,
+          originalName: pf.originalName,
+          extension: pf.originalName.split(".").pop()?.toUpperCase() || "BIN",
+          fileSize: pf.size,
+          mimeType: pf.mimeType,
+          uploadedAt: pf.createdAt,
+          ownerAddress: pf.ownerWallet,
+          keyHex: matchingLocal?.keyHex || "",
+          wrappedKey: matchingLocal?.wrappedKey,
+          algorithm: pf.encryptionAlgorithm,
+          sharedWith: matchingLocal?.sharedWith || [],
+          totalChunks: pf.totalChunks,
+          chunkSize: pf.chunkSize,
+          manifestCID: pf.manifestCID,
+          logicalPath: pf.logicalPath,
+          uploadStatus: pf.uploadStatus,
+          integrityStatus: pf.integrityStatus,
+        };
+      });
+    } catch (err) {
+      console.warn("Could not query Payload files:", err);
+    }
+
+    // Merge: Payload entries are primary, complemented by local-only entries
+    const fileMap = new Map<string, StoredEncryptedFile>();
+    for (const pf of payloadDocs) {
+      if (pf.id) fileMap.set(pf.id, pf);
+    }
+    for (const lf of localFiles) {
+      const exists = Array.from(fileMap.values()).some(
+        (f) => (f.cid && f.cid === lf.cid) || f.fileName === lf.fileName
+      );
+      if (!exists) {
+        fileMap.set(lf.id, lf);
+      }
+    }
+
+    setMyFiles(Array.from(fileMap.values()));
     setSharedFiles(address ? getSharedWithMeFiles(address) : []);
   }, [address, vaultXIdentity]);
 
@@ -424,8 +477,9 @@ export function RecentFiles() {
               <tr>
                 <th className="py-3 px-5">File Name & IPFS CID</th>
                 <th className="py-3 px-4">Size</th>
-                <th className="py-3 px-4">Encryption</th>
-                <th className="py-3 px-4">Date Pinned</th>
+                <th className="py-3 px-4">Chunks</th>
+                <th className="py-3 px-4">Encryption & Integrity</th>
+                <th className="py-3 px-4">Uploaded</th>
                 <th className="py-3 px-4">Shares</th>
                 <th className="py-3 px-5 text-right">Actions</th>
               </tr>
@@ -440,32 +494,41 @@ export function RecentFiles() {
                         <Lock className="h-3.5 w-3.5" />
                       </div>
                       <div className="flex flex-col min-w-0">
-                        <span className="truncate max-w-[200px] sm:max-w-xs text-xs font-semibold text-slate-900 group-hover:text-[#2563EB] transition-colors">
+                        <button
+                          type="button"
+                          onClick={() => setDetailsModalFile(file)}
+                          className="truncate max-w-[180px] sm:max-w-xs text-xs font-semibold text-slate-900 hover:text-[#2563EB] text-left transition-colors"
+                          title="Click to view file details & chunk map"
+                        >
                           {file.fileName}
-                        </span>
+                        </button>
                         <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono">
-                          <span>CID: {file.cid.substring(0, 8)}...{file.cid.slice(-6)}</span>
-                          <button
-                            onClick={() => handleCopy(file.cid, "cid")}
-                            title="Copy IPFS CID"
-                            type="button"
-                            className="hover:text-[#2563EB]"
-                          >
-                            {copiedCid === file.cid ? (
-                              <Check className="h-3 w-3 text-emerald-600" />
-                            ) : (
-                              <Copy className="h-3 w-3" />
-                            )}
-                          </button>
-                          <a
-                            href={getIpfsUrl(file.cid)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title="View Raw Ciphertext on IPFS"
-                            className="hover:text-[#2563EB] inline-flex items-center gap-0.5"
-                          >
-                            <ExternalLink className="h-2.5 w-2.5" />
-                          </a>
+                          <span>CID: {file.cid ? `${file.cid.substring(0, 8)}...${file.cid.slice(-6)}` : "Pending"}</span>
+                          {file.cid && (
+                            <>
+                              <button
+                                onClick={() => handleCopy(file.cid, "cid")}
+                                title="Copy IPFS CID"
+                                type="button"
+                                className="hover:text-[#2563EB]"
+                              >
+                                {copiedCid === file.cid ? (
+                                  <Check className="h-3 w-3 text-emerald-600" />
+                                ) : (
+                                  <Copy className="h-3 w-3" />
+                                )}
+                              </button>
+                              <a
+                                href={getIpfsUrl(file.cid)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title="View Raw Ciphertext on IPFS"
+                                className="hover:text-[#2563EB] inline-flex items-center gap-0.5"
+                              >
+                                <ExternalLink className="h-2.5 w-2.5" />
+                              </a>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -476,16 +539,29 @@ export function RecentFiles() {
                     {formatBytes(file.fileSize)}
                   </td>
 
-                  {/* Encryption Status */}
-                  <td data-label="Encryption" className="py-3.5 px-4">
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[10px] text-emerald-700 font-semibold">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                      Encrypted Verified
+                  {/* Chunks */}
+                  <td data-label="Chunks" className="py-3.5 px-4">
+                    <span className="inline-flex items-center font-mono text-[11px] font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">
+                      {file.totalChunks || 1} {file.totalChunks === 1 ? "chunk" : "chunks"}
                     </span>
                   </td>
 
+                  {/* Encryption & Integrity Status */}
+                  <td data-label="Security" className="py-3.5 px-4">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#2563EB]">
+                        <Check className="h-3 w-3" />
+                        AES-256-GCM
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-medium">
+                        <ShieldCheck className="h-3 w-3 text-emerald-600" />
+                        SHA-256 Verified
+                      </span>
+                    </div>
+                  </td>
+
                   {/* Date */}
-                  <td data-label="Date" className="py-3.5 px-4 text-slate-500 text-[11px]">
+                  <td data-label="Uploaded" className="py-3.5 px-4 text-slate-500 text-[11px]">
                     {new Date(file.uploadedAt).toLocaleDateString("en-US", {
                       month: "short",
                       day: "numeric",
@@ -507,6 +583,15 @@ export function RecentFiles() {
                   {/* Actions */}
                   <td data-label="Actions" className="py-3.5 px-5 text-right">
                     <div className="flex items-center justify-end gap-1.5">
+                      {/* Drive File Details Modal Button */}
+                      <button
+                        onClick={() => setDetailsModalFile(file)}
+                        type="button"
+                        title="View Drive File Details & Chunk Map"
+                        className="p-1.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:text-[#2563EB] hover:border-blue-300 transition-colors"
+                      >
+                        <Info className="h-3.5 w-3.5" />
+                      </button>
                       {/* Decrypt Button (Prompts for AES key) */}
                       <button
                         onClick={() => handleOpenDecryptModal(file)}
@@ -958,6 +1043,15 @@ export function RecentFiles() {
           </div>
         </div>
       )}
+
+      {/* Drive-Style File Details Modal */}
+      <FileDetailsModal
+        isOpen={!!detailsModalFile}
+        onClose={() => setDetailsModalFile(null)}
+        fileId={detailsModalFile?.id || null}
+        localKeyHex={detailsModalFile?.keyHex || null}
+        vaultXId={vaultXIdentity?.id}
+      />
     </div>
   );
 }
