@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { payloadService } from "@/lib/payload/client";
 import { formatShareCodeInput } from "@/lib/shareCode";
 
+import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
+
 /**
  * GET /api/payload/shares/lookup?code=SV-XXXX-XXXX-XXXX
  * Public sanitized endpoint for recipients to inspect a share code.
@@ -9,6 +11,18 @@ import { formatShareCodeInput } from "@/lib/shareCode";
  */
 export async function GET(req: NextRequest) {
   try {
+    const ip = getClientIp(req.headers);
+    const rateLimit = checkRateLimit(`share_lookup:${ip}`);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { success: false, error: rateLimit.error },
+        { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds || 60) } }
+      );
+    }
+    if (rateLimit.delayMs) {
+      await new Promise((r) => setTimeout(r, rateLimit.delayMs));
+    }
+
     const { searchParams } = new URL(req.url);
     const rawCode = searchParams.get("code") || "";
     const code = formatShareCodeInput(rawCode);
@@ -47,6 +61,16 @@ export async function GET(req: NextRequest) {
           { status: 410 }
         );
       }
+      if (status === "download-limit-reached") {
+        return NextResponse.json(
+          {
+            success: false,
+            status: "download-limit-reached",
+            error: "The download limit for this share has been reached.",
+          },
+          { status: 410 }
+        );
+      }
       return NextResponse.json(
         {
           success: false,
@@ -57,7 +81,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Sanitized share information for recipient
+    // Sanitized share information for recipient (NO raw keys or envelopes exposed)
     const sanitized = {
       shareCode: share.shareCode,
       fileName: share.fileName,
@@ -68,7 +92,12 @@ export async function GET(req: NextRequest) {
       integrityAlgorithm: share.integrityAlgorithm,
       expiresAt: share.expiresAt,
       downloadCount: share.downloadCount,
-      downloadsRemaining: "Unlimited",
+      maxDownloads: share.maxDownloads,
+      oneTime: share.oneTime,
+      recipientUserId: share.recipientUserId,
+      recipientPublicKeyFingerprint: share.recipientPublicKeyFingerprint,
+      isQuickShare: share.isQuickShare,
+      hasEncryptedKey: Boolean(share.encryptedFileKey || share.quickShareEnvelope),
       passwordProtected: share.passwordProtected,
       status: share.status,
     };

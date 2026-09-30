@@ -214,7 +214,7 @@ export async function deletePayloadFile(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SECURE SHARE CLIENT API
+// SECURE SHARE & E2EE IDENTITY CLIENT API
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface CreateSecureShareParams {
@@ -224,7 +224,15 @@ export interface CreateSecureShareParams {
   mimeType?: string;
   manifestCID?: string;
   cid?: string;
+  recipientUserId?: string;
+  recipientPublicKeyFingerprint?: string;
+  encryptedFileKey?: string;
+  keyAgreementMetadata?: any;
+  isQuickShare?: boolean;
+  quickShareEnvelope?: string;
   expirationOption?: "never" | "1h" | "24h" | "7d" | "30d";
+  downloadLimitOption?: "1" | "5" | "10" | "unlimited";
+  oneTime?: boolean;
   passwordProtected?: boolean;
   password?: string;
 }
@@ -282,12 +290,16 @@ export async function lookupSecureShare(shareCode: string) {
   }
 }
 
-export async function accessSecureShare(shareCode: string, password?: string) {
+export async function accessSecureShare(
+  shareCode: string,
+  accessorWallet?: string,
+  password?: string
+) {
   try {
     const res = await fetch("/api/payload/shares/access", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code: shareCode, password }),
+      body: JSON.stringify({ code: shareCode, accessorWallet, password }),
     });
     const data = await res.json();
     return data;
@@ -312,6 +324,55 @@ export async function revokeSecureShare(
   } catch (err) {
     console.error("revokeSecureShare error:", err);
     return false;
+  }
+}
+
+export async function registerEncryptionIdentityApi(
+  publicKeyHex: string,
+  fingerprint: string,
+  walletAddress: string
+): Promise<boolean> {
+  try {
+    const res = await fetch("/api/payload/users/keys", {
+      method: "POST",
+      headers: getAuthHeaders(walletAddress),
+      body: JSON.stringify({ publicKeyHex, fingerprint }),
+    });
+    const data = await res.json();
+    return Boolean(data.success);
+  } catch (err) {
+    console.warn("registerEncryptionIdentityApi error:", err);
+    return false;
+  }
+}
+
+export async function lookupRecipientProfileApi(
+  walletAddress: string
+): Promise<{ registered: boolean; user?: { walletAddress: string; publicKeyHex: string; publicKeyFingerprint: string } }> {
+  try {
+    const res = await fetch(`/api/payload/users/${encodeURIComponent(walletAddress.toLowerCase())}`);
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      return { registered: false };
+    }
+    return { registered: true, user: data.user };
+  } catch {
+    return { registered: false };
+  }
+}
+
+export async function listRegisteredUsersApi(): Promise<Array<{
+  walletAddress: string;
+  publicKeyFingerprint?: string;
+  publicEncryptionKey?: string;
+  network?: string;
+}>> {
+  try {
+    const res = await fetch("/api/payload/users");
+    const data = await res.json();
+    return data.success && Array.isArray(data.users) ? data.users : [];
+  } catch {
+    return [];
   }
 }
 

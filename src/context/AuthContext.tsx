@@ -103,6 +103,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [address]);
 
   /**
+   * Auto-initialize & register dedicated E2EE asymmetric encryption identity
+   * whenever a wallet connects (private key stays on device, public key registered).
+   */
+  useEffect(() => {
+    if (address) {
+      import("@/lib/e2ee").then(({ getOrCreateLocalIdentity }) => {
+        getOrCreateLocalIdentity(address).then((id) => {
+          import("@/lib/payloadClient").then(({ registerEncryptionIdentityApi }) => {
+            registerEncryptionIdentityApi(id.publicKeyHex, id.fingerprint, address);
+          });
+        });
+      }).catch((err) => {
+        console.warn("Could not initialize E2EE identity:", err);
+      });
+    }
+  }, [address]);
+
+  /**
    * Cryptographic Sign-In With Ethereum (SIWE) Flow
    */
   const signInWithWallet = useCallback(async (): Promise<boolean> => {

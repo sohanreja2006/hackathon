@@ -25,6 +25,16 @@ export const UsersCollection = {
       defaultValue: "Sepolia",
     },
     {
+      name: "publicEncryptionKey",
+      type: "text",
+      required: false,
+    },
+    {
+      name: "publicKeyFingerprint",
+      type: "text",
+      required: false,
+    },
+    {
       name: "lastAuthenticatedAt",
       type: "date",
       required: true,

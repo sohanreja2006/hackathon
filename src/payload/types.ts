@@ -12,6 +12,8 @@ export interface PayloadUser {
   id: string;
   walletAddress: string;
   network?: string;
+  publicEncryptionKey?: string;
+  publicKeyFingerprint?: string;
   createdAt: string;
   lastAuthenticatedAt: string;
 }
@@ -89,8 +91,15 @@ export type ShareStatus = "active" | "expired" | "revoked" | "download-limit-rea
 export type ShareExpirationOption = "never" | "1h" | "24h" | "7d" | "30d";
 export type ShareDownloadLimitOption = "1" | "5" | "10" | "unlimited";
 
+export interface KeyAgreementMetadata {
+  ephemeralPublicKey: string; // X25519 ephemeral public key hex
+  iv: string;                 // AES-256-GCM IV hex
+  algorithm: "X25519-HKDF-SHA256-AES256GCM";
+}
+
 export interface PayloadShare {
   id: string;
+  shareId?: string;
   shareCode: string; // e.g. SV-9X4K-7P2M-Q81D
   fileId: string;
   fileName: string;
@@ -98,6 +107,17 @@ export interface PayloadShare {
   mimeType: string;
   ownerWallet: string;
   manifestCID: string;
+
+  // E2EE fields
+  recipientUserId?: string; // Designated recipient wallet address or user ID
+  recipientPublicKeyFingerprint?: string; // 7A91 42D8 C31F...
+  encryptedFileKey?: string; // Asymmetric AES-GCM wrapped key envelope (hex)
+  keyAgreementMetadata?: KeyAgreementMetadata;
+
+  // Quick Share mode
+  isQuickShare?: boolean;
+  quickShareEnvelope?: string;
+
   encryptionAlgorithm: "AES-256-GCM";
   integrityAlgorithm: "SHA-256";
   expiresAt: string | null; // ISO date string or null for never

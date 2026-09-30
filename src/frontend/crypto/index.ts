@@ -8,3 +8,5 @@
  */
 
 export * from "@/lib/crypto";
+export * as e2ee from "@/lib/e2ee";
+export * from "@/lib/e2ee";

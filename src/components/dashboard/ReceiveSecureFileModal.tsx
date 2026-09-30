@@ -1,20 +1,22 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useAccount } from "wagmi";
 import {
   X,
   ShieldCheck,
   Lock,
   Download,
-  KeyRound,
   Loader2,
   AlertCircle,
   FileDown,
   Check,
-  Eye,
-  EyeOff,
   Layers,
   Sparkles,
+  QrCode,
+  KeyRound,
+  UserCheck,
+  AlertTriangle,
 } from "lucide-react";
 import { formatBytes, downloadAndDecryptFromIpfs } from "@/lib/crypto";
 import { OwlCompanion, OwlState } from "@/components/ui/OwlCompanion";
@@ -22,6 +24,12 @@ import { formatShareCodeInput, isValidShareCodeFormat } from "@/lib/shareCode";
 import { lookupSecureShare, accessSecureShare } from "@/lib/payloadClient";
 import { getIpfsUrl, fetchFromIpfs } from "@/lib/ipfs/gateway";
 import { getAllVaultFiles } from "@/lib/fileStorage";
+import {
+  getLocalEncryptionIdentity,
+  unwrapKeyEnvelope,
+  unwrapQuickShareEnvelope,
+} from "@/lib/e2ee";
+import { SecurityVerificationModal } from "./SecurityVerificationModal";
 
 interface ReceiveSecureFileModalProps {
   isOpen: boolean;
@@ -34,6 +42,8 @@ export function ReceiveSecureFileModal({
   onClose,
   initialCode = "",
 }: ReceiveSecureFileModalProps) {
+  const { address, isConnected } = useAccount();
+
   // Input code state
   const [shareCode, setShareCode] = useState(initialCode ? formatShareCodeInput(initialCode) : "");
   const [isLookingUp, setIsLookingUp] = useState(false);
@@ -50,16 +60,22 @@ export function ReceiveSecureFileModal({
     integrityAlgorithm: string;
     expiresAt: string | null;
     passwordProtected: boolean;
+    recipientUserId?: string | null;
+    recipientPublicKeyFingerprint?: string | null;
+    isQuickShare?: boolean;
+    hasEncryptedKey?: boolean;
   } | null>(null);
+
+  // Quick share secret if applicable
+  const [quickShareSecret, setQuickShareSecret] = useState("");
+  const [secretError, setSecretError] = useState<string | null>(null);
 
   // Password state if required
   const [passwordInput, setPasswordInput] = useState("");
   const [passwordError, setPasswordError] = useState<string | null>(null);
 
-  // AES Decryption Key state
-  const [keyInput, setKeyInput] = useState("");
-  const [showKeyInput, setShowKeyInput] = useState(false);
-  const [keyError, setKeyError] = useState<string | null>(null);
+  // Security Verification Modal
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
 
   // Retrieval & Decryption state
   const [isProcessing, setIsProcessing] = useState(false);
@@ -72,24 +88,21 @@ export function ReceiveSecureFileModal({
   // Dynamic Owl State
   const [owlState, setOwlState] = useState<OwlState>("idle");
 
-  // Cleaned AES-256 key input
-  const cleanKey = keyInput.trim().replace(/^0x/i, "").replace(/[\s\-:]/g, "");
-
-  // Auto-detect zero-knowledge key from URL hash or query param (#key=... or ?key=...)
+  // Auto-detect Quick Share secret or key from URL hash or query param (#secret=... or ?secret=...)
   useEffect(() => {
     if (typeof window !== "undefined") {
       const hash = window.location.hash;
       const urlParams = new URLSearchParams(window.location.search);
-      const keyFromUrl = urlParams.get("key");
-      const match = hash.match(/key=([0-9a-fA-F]{64})/i) || hash.match(/#([0-9a-fA-F]{64})/i);
-      const foundKey = match ? match[1] : (keyFromUrl && /^[0-9a-fA-F]{64}$/.test(keyFromUrl) ? keyFromUrl : null);
-      if (foundKey) {
-        setKeyInput(foundKey);
+      const secretFromUrl = urlParams.get("secret");
+      const matchSecret = hash.match(/secret=([a-zA-Z0-9_\-]+)/i);
+      const foundSecret = matchSecret ? matchSecret[1] : (secretFromUrl || null);
+      if (foundSecret) {
+        setQuickShareSecret(foundSecret);
       }
     }
   }, []);
 
-  // Look for a matching encrypted file in this browser's local vault
+  // Look for a matching encrypted file in this browser's local vault (fallback)
   const matchingLocalFile = React.useMemo(() => {
     if (!foundShare || typeof window === "undefined") return null;
     try {
@@ -110,13 +123,6 @@ export function ReceiveSecureFileModal({
       return null;
     }
   }, [foundShare]);
-
-  // Auto-fill key if local match exists and input is empty
-  useEffect(() => {
-    if (matchingLocalFile?.keyHex && !keyInput) {
-      setKeyInput(matchingLocalFile.keyHex);
-    }
-  }, [matchingLocalFile]);
 
   useEffect(() => {
     if (initialCode) {
@@ -172,6 +178,14 @@ export function ReceiveSecureFileModal({
     }
   };
 
+  const isRecipientAuthorized = () => {
+    if (!foundShare) return false;
+    if (foundShare.isQuickShare) return true;
+    if (!foundShare.recipientUserId) return true;
+    if (!isConnected || !address) return false;
+    return address.toLowerCase() === foundShare.recipientUserId.toLowerCase();
+  };
+
   const handleStartDecryptionAndDownload = async () => {
     if (!foundShare) return;
 
@@ -180,37 +194,40 @@ export function ReceiveSecureFileModal({
       return;
     }
 
-    const keyToUse = cleanKey;
-    if (!keyToUse) {
-      setKeyError("Please enter the 64-character AES-256 decryption key provided by the owner.");
+    if (foundShare.isQuickShare && !quickShareSecret.trim()) {
+      setSecretError("Please provide the Quick Share secret key from the share link.");
       return;
     }
 
-    if (keyToUse.length !== 64 || !/^[0-9a-fA-F]{64}$/.test(keyToUse)) {
-      if (keyToUse.length < 64) {
-        setKeyError(
-          `Incomplete key: entered ${keyToUse.length} of 64 hex characters. The AES key is a 64-character hex string generated during file encryption (different from the share password).`
-        );
-      } else if (keyToUse.length > 64) {
-        setKeyError(
-          `Invalid key length: ${keyToUse.length} characters (expected 64). Please check for extra characters or spaces.`
-        );
-      } else {
-        setKeyError("Invalid key format: AES key must contain only hexadecimal characters (0-9, a-f).");
+    if (!foundShare.isQuickShare && foundShare.recipientUserId) {
+      if (!isConnected || !address) {
+        setLookupError("Please connect your recipient Web3 wallet to unlock this end-to-end encrypted file.");
+        return;
       }
-      return;
+      if (address.toLowerCase() !== foundShare.recipientUserId.toLowerCase()) {
+        setLookupError(
+          `Access restricted: This file is encrypted specifically for recipient ${foundShare.recipientUserId.slice(0, 6)}...${foundShare.recipientUserId.slice(-4)}. Your connected wallet (${address.slice(0, 6)}...${address.slice(-4)}) is not authorized.`
+        );
+        return;
+      }
     }
 
     try {
       setIsProcessing(true);
       setIntegrityError(null);
       setPasswordError(null);
-      setKeyError(null);
-      setOwlState("encrypting");
-      setProgressMessage("Validating share code and authorization...");
+      setSecretError(null);
+      setLookupError(null);
+      setOwlState("verifying");
+      setProgressMessage("Authenticating recipient and validating authorization...");
 
-      // 1. Access share
-      const accessRes = await accessSecureShare(foundShare.shareCode, passwordInput.trim() || undefined);
+      // 1. Access share from server
+      const accessRes = await accessSecureShare(
+        foundShare.shareCode,
+        address || undefined,
+        passwordInput.trim() || undefined
+      );
+
       if (!accessRes.success) {
         if (accessRes.error?.toLowerCase().includes("password")) {
           setPasswordError(accessRes.error);
@@ -224,19 +241,68 @@ export function ReceiveSecureFileModal({
 
       const { file, manifest, chunks } = accessRes;
 
-      // 2. Chunks & Integrity Verification
+      // 2. Recover AES-256-GCM File Key using Asymmetric Identity
+      setOwlState("decrypting");
+      setProgressMessage("Unwrapping encrypted key envelope locally with your private key...");
+
+      let recoveredKeyHex = "";
+
+      if (accessRes.isQuickShare && accessRes.quickShareEnvelope) {
+        // Quick Share: unwrap envelope with high-entropy secret
+        try {
+          recoveredKeyHex = await unwrapQuickShareEnvelope(
+            accessRes.quickShareEnvelope,
+            quickShareSecret.trim()
+          );
+        } catch {
+          throw new Error("Failed to unwrap Quick Share key envelope. Please check the secret key.");
+        }
+      } else if (accessRes.encryptedFileKey && accessRes.keyAgreementMetadata) {
+        // Direct E2EE: unwrap with recipient's device-local private X25519 key
+        if (!address) {
+          throw new Error("Connected wallet address required to retrieve local private key.");
+        }
+        const localId = await getLocalEncryptionIdentity(address);
+        if (!localId || !localId.privateKeyHex) {
+          throw new Error(
+            `SecureVault encryption private key not found on this device for ${address.slice(0, 6)}...${address.slice(-4)}. The private key never leaves the device where your identity was created.`
+          );
+        }
+
+        try {
+          recoveredKeyHex = await unwrapKeyEnvelope(
+            accessRes.encryptedFileKey,
+            accessRes.keyAgreementMetadata,
+            localId.privateKeyHex
+          );
+        } catch (envelopeErr) {
+          console.error("Envelope unwrap error:", envelopeErr);
+          throw new Error("Cryptographic key agreement failed. Could not decrypt key envelope with local private key.");
+        }
+      } else if (matchingLocalFile?.keyHex) {
+        // Fallback for files originating from this device
+        recoveredKeyHex = matchingLocalFile.keyHex;
+      } else {
+        throw new Error("No cryptographic key envelope found for this share.");
+      }
+
+      if (!recoveredKeyHex || recoveredKeyHex.length !== 64) {
+        throw new Error("Invalid recovered file key length.");
+      }
+
+      // 3. Chunks & Integrity Verification
       const totalChunks = chunks?.length || manifest?.chunks?.length || 1;
       setChunkProgress({ current: 0, total: totalChunks });
       setProgressMessage(`Retrieving encrypted chunks (0 / ${totalChunks})...`);
 
-      const targetChunks = (chunks && chunks.length > 0) ? chunks : (manifest?.chunks || []);
+      const targetChunks = chunks && chunks.length > 0 ? chunks : manifest?.chunks || [];
       const verifiedIndices: number[] = [];
 
       // Download and verify each chunk hash
       if (targetChunks.length > 0) {
         for (let i = 0; i < targetChunks.length; i++) {
           const ch = targetChunks[i];
-          setProgressMessage(`Retrieving encrypted chunk ${i + 1} of ${totalChunks}...`);
+          setProgressMessage(`Retrieving encrypted chunk ${i + 1} of ${totalChunks} from IPFS...`);
           setChunkProgress({ current: i + 1, total: totalChunks });
 
           // Fetch chunk buffer from IPFS with multi-gateway failover
@@ -259,7 +325,7 @@ export function ReceiveSecureFileModal({
 
           if (ch.hash && computedHash.toLowerCase() !== ch.hash.toLowerCase()) {
             setOwlState("error");
-            setIntegrityError(`Integrity verification failed on chunk ${i + 1}. Checksum mismatch.`);
+            setIntegrityError(`Integrity verification failed on chunk ${i + 1}. SHA-256 checksum mismatch.`);
             return;
           }
 
@@ -268,7 +334,7 @@ export function ReceiveSecureFileModal({
         }
       }
 
-      // 3. Decrypt payload locally using WebCrypto
+      // 4. Decrypt payload locally using WebCrypto
       setOwlState("decrypting");
       setProgressMessage("All chunks verified! Decrypting locally in browser WebCrypto...");
 
@@ -284,12 +350,12 @@ export function ReceiveSecureFileModal({
 
       const decrypted = await downloadAndDecryptFromIpfs(
         targetCid,
-        keyToUse,
+        recoveredKeyHex,
         undefined,
         (msg) => setProgressMessage(msg)
       );
 
-      // 4. File reconstructed
+      // 5. File reconstructed
       const url = window.URL.createObjectURL(decrypted.plainBlob);
       const fileName = decrypted.originalName || file.fileName;
       setDownloadReady({ name: fileName, url });
@@ -305,15 +371,7 @@ export function ReceiveSecureFileModal({
       document.body.removeChild(a);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Retrieval failed.";
-      if (
-        msg.toLowerCase().includes("operation failed") ||
-        msg.toLowerCase().includes("operationerror") ||
-        msg.toLowerCase().includes("tag")
-      ) {
-        setKeyError("Decryption failed: Incorrect AES-256 key. Tag mismatch.");
-      } else {
-        setIntegrityError(`Error: ${msg}`);
-      }
+      setIntegrityError(`Decryption error: ${msg}`);
       setOwlState("error");
     } finally {
       setIsProcessing(false);
@@ -326,8 +384,8 @@ export function ReceiveSecureFileModal({
     setLookupError(null);
     setPasswordInput("");
     setPasswordError(null);
-    setKeyInput("");
-    setKeyError(null);
+    setQuickShareSecret("");
+    setSecretError(null);
     setDownloadReady(null);
     setVerifiedChunks([]);
     setChunkProgress(null);
@@ -346,7 +404,7 @@ export function ReceiveSecureFileModal({
             <div>
               <h2 className="text-base font-bold text-slate-900">Receive a Secure File</h2>
               <p className="text-[11px] text-slate-500">
-                Retrieve & decrypt an encrypted file using a Secure Share Code
+                End-to-end encrypted retrieval & local browser decryption
               </p>
             </div>
           </div>
@@ -369,6 +427,8 @@ export function ReceiveSecureFileModal({
               <p className="text-[11px] text-slate-600">
                 {downloadReady
                   ? "File reconstructed safely! Decryption happened completely in your browser."
+                  : isProcessing
+                  ? "Owl Guardian protecting decryption flow. Private keys never leave your machine."
                   : foundShare
                   ? "Secure file located. Chunks will be verified with SHA-256 before local decryption."
                   : "Enter the Secure Share Code below to locate the encrypted IPFS payload."}
@@ -415,8 +475,8 @@ export function ReceiveSecureFileModal({
               </div>
 
               {lookupError && (
-                <div className="flex items-center gap-2 p-3 rounded-2xl border border-rose-200 bg-rose-50 text-xs text-rose-600 animate-in fade-in duration-150">
-                  <AlertCircle className="h-4 w-4 shrink-0" />
+                <div className="flex items-start gap-2 p-3 rounded-2xl border border-rose-200 bg-rose-50 text-xs text-rose-600 animate-in fade-in duration-150">
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
                   <span>{lookupError}</span>
                 </div>
               )}
@@ -441,9 +501,15 @@ export function ReceiveSecureFileModal({
                       <span className="inline-flex items-center gap-1 text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
                         <ShieldCheck className="h-3 w-3" /> Integrity Protected
                       </span>
-                      <span className="inline-flex items-center gap-1 text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
-                        Unlimited Access
-                      </span>
+                      {foundShare.isQuickShare ? (
+                        <span className="inline-flex items-center gap-1 text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200">
+                          Quick Share
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200">
+                          E2EE Asymmetric
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -452,7 +518,7 @@ export function ReceiveSecureFileModal({
                     <div className="p-3.5 rounded-2xl border border-amber-200 bg-amber-50/50 space-y-2">
                       <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900">
                         <Lock className="h-3.5 w-3.5 text-amber-700" />
-                        <span>This file requires a password</span>
+                        <span>Additional access password required</span>
                       </div>
                       <input
                         type="password"
@@ -461,7 +527,7 @@ export function ReceiveSecureFileModal({
                           setPasswordInput(e.target.value);
                           setPasswordError(null);
                         }}
-                        placeholder="Enter share password..."
+                        placeholder="Enter password..."
                         className="w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-amber-500"
                       />
                       {passwordError && (
@@ -470,72 +536,126 @@ export function ReceiveSecureFileModal({
                     </div>
                   )}
 
-                  {/* Decryption Key Section */}
-                  <div className="p-4 rounded-2xl border border-slate-200 bg-white space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                        <KeyRound className="h-3.5 w-3.5 text-[#2563EB]" />
-                        <span>AES-256 Decryption Key</span>
-                        {cleanKey.length > 0 && (
-                          <span
-                            className={`text-[10px] font-mono font-semibold ${
-                              cleanKey.length === 64 ? "text-emerald-600" : "text-amber-600"
-                            }`}
-                          >
-                            ({cleanKey.length}/64)
+                  {/* Quick Share Secret Prompt if applicable */}
+                  {foundShare.isQuickShare && (
+                    <div className="p-3.5 rounded-2xl border border-purple-200 bg-purple-50/50 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-purple-900">
+                          <KeyRound className="h-3.5 w-3.5 text-purple-700" />
+                          <span>Quick Share Secret</span>
+                        </div>
+                        {quickShareSecret && (
+                          <span className="text-[10px] text-emerald-700 bg-emerald-100/60 px-2 py-0.5 rounded font-medium">
+                            Auto-detected from link
                           </span>
                         )}
-                      </label>
-                      <div className="flex items-center gap-2">
-                        {matchingLocalFile?.keyHex && cleanKey !== matchingLocalFile.keyHex && (
+                      </div>
+                      <input
+                        type="text"
+                        value={quickShareSecret}
+                        onChange={(e) => {
+                          setQuickShareSecret(e.target.value);
+                          setSecretError(null);
+                        }}
+                        placeholder="Paste secret key from link..."
+                        className="w-full rounded-xl border border-purple-200 bg-white px-3 py-2 text-xs font-mono text-slate-900 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                      />
+                      {secretError && (
+                        <p className="text-[11px] text-rose-600 font-semibold">{secretError}</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* True E2EE Details & WhatsApp-Style Security Verification */}
+                  {!foundShare.isQuickShare && (
+                    <div className="p-4 rounded-2xl border border-blue-200 bg-blue-50/40 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-blue-900 tracking-wide">
+                          <ShieldCheck className="h-4 w-4 text-[#2563EB]" />
+                          <span>END-TO-END ENCRYPTED</span>
+                        </div>
+                        <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100/70 border border-emerald-200 px-2 py-0.5 rounded-full">
+                          Asymmetric Protected
+                        </span>
+                      </div>
+
+                      <div className="space-y-1.5 text-xs text-slate-700 bg-white/80 p-3 rounded-xl border border-slate-200/80">
+                        <div className="flex justify-between py-0.5">
+                          <span className="text-slate-500 font-medium">Recipient:</span>
+                          <span className="font-mono font-semibold text-slate-900">
+                            {foundShare.recipientUserId
+                              ? `${foundShare.recipientUserId.slice(0, 6)}...${foundShare.recipientUserId.slice(-4)}`
+                              : "Targeted User"}
+                          </span>
+                        </div>
+                        <div className="flex justify-between py-0.5">
+                          <span className="text-slate-500 font-medium">Encryption:</span>
+                          <span className="font-semibold text-slate-900">AES-256-GCM</span>
+                        </div>
+                        <div className="flex justify-between py-0.5">
+                          <span className="text-slate-500 font-medium">Key protection:</span>
+                          <span className="font-semibold text-slate-900">Recipient public key (X25519)</span>
+                        </div>
+                      </div>
+
+                      {/* Security Checklist */}
+                      <div className="space-y-1 text-[11px] text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                        <div className="flex items-center gap-1.5 text-emerald-700 font-medium">
+                          <Check className="h-3.5 w-3.5 shrink-0" />
+                          <span>End-to-end encrypted</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-emerald-700 font-medium">
+                          <Check className="h-3.5 w-3.5 shrink-0" />
+                          <span>Private key stays on device</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-emerald-700 font-medium">
+                          <Check className="h-3.5 w-3.5 shrink-0" />
+                          <span>Integrity verified</span>
+                        </div>
+                      </div>
+
+                      {/* Security Verification Fingerprint */}
+                      {foundShare.recipientPublicKeyFingerprint && (
+                        <div className="pt-2 border-t border-blue-200/60 flex items-center justify-between">
+                          <div>
+                            <div className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+                              Security Verification
+                            </div>
+                            <div className="font-mono text-xs font-bold text-slate-900 tracking-wider">
+                              {foundShare.recipientPublicKeyFingerprint.slice(0, 19)}...
+                            </div>
+                          </div>
                           <button
                             type="button"
-                            onClick={() => {
-                              setKeyInput(matchingLocalFile.keyHex!);
-                              setKeyError(null);
-                            }}
-                            className="text-[10px] font-semibold text-[#2563EB] hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded-md transition-colors"
+                            onClick={() => setIsQrModalOpen(true)}
+                            className="flex items-center gap-1 text-xs font-semibold text-[#2563EB] hover:text-blue-700 bg-white hover:bg-blue-50 px-2.5 py-1.5 rounded-lg border border-blue-200 transition-colors shadow-2xs"
                           >
-                            Fill from Vault
+                            <QrCode className="h-3.5 w-3.5" />
+                            <span>Show QR</span>
                           </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => setShowKeyInput(!showKeyInput)}
-                          className="text-[11px] text-slate-400 hover:text-slate-600 flex items-center gap-1"
-                        >
-                          {showKeyInput ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                          <span>{showKeyInput ? "Hide" : "Show"}</span>
-                        </button>
-                      </div>
+                        </div>
+                      )}
+
+                      {/* Authorization Warning if connected wallet does not match */}
+                      {foundShare.recipientUserId && isConnected && address && (
+                        <div className="pt-1">
+                          {address.toLowerCase() === foundShare.recipientUserId.toLowerCase() ? (
+                            <div className="flex items-center gap-1.5 text-[11px] text-emerald-700 font-semibold bg-emerald-50 p-2 rounded-lg border border-emerald-200">
+                              <UserCheck className="h-3.5 w-3.5 shrink-0" />
+                              <span>Recipient wallet authenticated: {address.slice(0, 6)}...{address.slice(-4)}</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5 text-[11px] text-amber-800 font-medium bg-amber-50 p-2 rounded-lg border border-amber-200">
+                              <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-600" />
+                              <span>
+                                Connected as {address.slice(0, 6)}...{address.slice(-4)}. Switch wallet to {foundShare.recipientUserId.slice(0, 6)}...{foundShare.recipientUserId.slice(-4)} to unlock.
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-
-                    <input
-                      type={showKeyInput ? "text" : "password"}
-                      value={keyInput}
-                      onChange={(e) => {
-                        setKeyInput(e.target.value);
-                        setKeyError(null);
-                      }}
-                      placeholder="Paste 64-character hexadecimal key provided by sender..."
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs text-slate-900 focus:bg-white focus:border-[#2563EB] focus:outline-none"
-                    />
-
-                    {matchingLocalFile?.keyHex && cleanKey === matchingLocalFile.keyHex && (
-                      <div className="flex items-center gap-1.5 text-[10px] text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
-                        <Check className="h-3 w-3 shrink-0" />
-                        <span>Decryption key automatically matched from your local vault file history.</span>
-                      </div>
-                    )}
-
-                    {keyError ? (
-                      <p className="text-[11px] text-rose-600 font-semibold leading-relaxed">{keyError}</p>
-                    ) : (
-                      <p className="text-[10px] text-slate-400">
-                        The 64-character AES key was created when the owner encrypted this file. It is required to reconstruct the plaintext on your machine.
-                      </p>
-                    )}
-                  </div>
+                  )}
 
                   {/* Live Progress & Integrity Tracker */}
                   {isProcessing && (
@@ -586,7 +706,7 @@ export function ReceiveSecureFileModal({
                 </div>
                 <h3 className="text-base font-bold text-slate-900">{downloadReady.name}</h3>
                 <p className="text-xs text-slate-500">
-                  Zero plaintext was transmitted over the network.
+                  Zero plaintext was transmitted over the network. Decrypted locally.
                 </p>
               </div>
 
@@ -645,18 +765,23 @@ export function ReceiveSecureFileModal({
               <button
                 type="button"
                 onClick={handleStartDecryptionAndDownload}
-                disabled={isProcessing || !keyInput}
+                disabled={
+                  Boolean(
+                    isProcessing ||
+                    (!foundShare.isQuickShare && foundShare.recipientUserId && !isRecipientAuthorized())
+                  )
+                }
                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs shadow-xs transition-all disabled:opacity-50"
               >
                 {isProcessing ? (
                   <>
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    <span>Processing File...</span>
+                    <span>Decrypting File...</span>
                   </>
                 ) : (
                   <>
                     <Download className="h-3.5 w-3.5" />
-                    <span>Verify, Decrypt & Download</span>
+                    <span>Unlock, Decrypt & Download</span>
                   </>
                 )}
               </button>
@@ -672,6 +797,17 @@ export function ReceiveSecureFileModal({
           )}
         </div>
       </div>
+
+      {/* Security Verification QR Modal */}
+      {foundShare?.recipientPublicKeyFingerprint && (
+        <SecurityVerificationModal
+          isOpen={isQrModalOpen}
+          onClose={() => setIsQrModalOpen(false)}
+          fingerprint={foundShare.recipientPublicKeyFingerprint}
+          recipientAddress={foundShare.recipientUserId || "Targeted Recipient"}
+        />
+      )}
     </div>
   );
 }
+

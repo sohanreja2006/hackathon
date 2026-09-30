@@ -56,7 +56,15 @@ export async function POST(req: NextRequest) {
       mimeType,
       manifestCID,
       cid,
+      recipientUserId,
+      recipientPublicKeyFingerprint,
+      encryptedFileKey,
+      keyAgreementMetadata,
+      isQuickShare = false,
+      quickShareEnvelope,
       expirationOption = "24h",
+      downloadLimitOption = "unlimited",
+      oneTime = false,
       passwordProtected = false,
       password = "",
     } = body;
@@ -72,6 +80,12 @@ export async function POST(req: NextRequest) {
     // Calculate expiration
     const expiresAt = computeExpiresAt(expirationOption as ShareExpirationOption);
 
+    // Calculate download limits
+    let maxDownloads: number | null = null;
+    if (downloadLimitOption === "1") maxDownloads = 1;
+    else if (downloadLimitOption === "5") maxDownloads = 5;
+    else if (downloadLimitOption === "10") maxDownloads = 10;
+
     // Hash password if enabled
     let passwordHash: string | undefined = undefined;
     if (passwordProtected && password && typeof password === "string" && password.trim().length > 0) {
@@ -85,7 +99,15 @@ export async function POST(req: NextRequest) {
       fileSize,
       mimeType,
       manifestCID: manifestCID || cid || "",
+      recipientUserId,
+      recipientPublicKeyFingerprint,
+      encryptedFileKey,
+      keyAgreementMetadata,
+      isQuickShare: Boolean(isQuickShare),
+      quickShareEnvelope,
       expiresAt,
+      maxDownloads,
+      oneTime: Boolean(oneTime),
       passwordProtected: Boolean(passwordProtected && passwordHash),
       passwordHash,
     });

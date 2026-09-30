@@ -111,6 +111,45 @@ export const payloadStore = {
     return newUser;
   },
 
+  registerUserPublicKey(
+    walletAddress: string,
+    publicKeyHex: string,
+    publicKeyFingerprint: string
+  ): PayloadUser {
+    loadStore();
+    const user = this.findOrCreateUser(walletAddress);
+    user.publicEncryptionKey = publicKeyHex;
+    user.publicKeyFingerprint = publicKeyFingerprint;
+    user.lastAuthenticatedAt = new Date().toISOString();
+    saveStore();
+    return user;
+  },
+
+  getUserByWallet(walletAddress: string): PayloadUser | null {
+    loadStore();
+    const normalized = walletAddress.toLowerCase();
+    return (
+      Object.values(memoryDb.users).find(
+        (u) => u.walletAddress.toLowerCase() === normalized
+      ) || null
+    );
+  },
+
+  listRegisteredUsers(): Array<{
+    walletAddress: string;
+    publicKeyFingerprint?: string;
+    publicEncryptionKey?: string;
+    network?: string;
+  }> {
+    loadStore();
+    return Object.values(memoryDb.users).map((u) => ({
+      walletAddress: u.walletAddress,
+      publicKeyFingerprint: u.publicKeyFingerprint,
+      publicEncryptionKey: u.publicEncryptionKey,
+      network: u.network,
+    }));
+  },
+
   // ── FILES ─────────────────────────────────────────────────────────────
   createFile(data: {
     ownerWallet: string;
@@ -269,8 +308,16 @@ export const payloadStore = {
     fileSize?: number;
     mimeType?: string;
     manifestCID?: string;
+    recipientUserId?: string;
+    recipientPublicKeyFingerprint?: string;
+    encryptedFileKey?: string;
+    keyAgreementMetadata?: import("@/payload/types").KeyAgreementMetadata;
+    isQuickShare?: boolean;
+    quickShareEnvelope?: string;
     expiresAt: string | null;
-    passwordProtected: boolean;
+    maxDownloads?: number | null;
+    oneTime?: boolean;
+    passwordProtected?: boolean;
     passwordHash?: string;
   }): PayloadShare | null {
     loadStore();
@@ -313,6 +360,7 @@ export const payloadStore = {
 
     const newShare: PayloadShare = {
       id: shareId,
+      shareId,
       shareCode,
       fileId: file.id,
       fileName,
@@ -320,13 +368,19 @@ export const payloadStore = {
       mimeType,
       ownerWallet: data.ownerWallet.toLowerCase(),
       manifestCID,
+      recipientUserId: data.recipientUserId ? data.recipientUserId.toLowerCase() : undefined,
+      recipientPublicKeyFingerprint: data.recipientPublicKeyFingerprint,
+      encryptedFileKey: data.encryptedFileKey,
+      keyAgreementMetadata: data.keyAgreementMetadata,
+      isQuickShare: Boolean(data.isQuickShare),
+      quickShareEnvelope: data.quickShareEnvelope,
       encryptionAlgorithm: "AES-256-GCM",
       integrityAlgorithm: "SHA-256",
       expiresAt: data.expiresAt,
-      maxDownloads: null, // Unlimited downloads
+      maxDownloads: data.maxDownloads !== undefined ? data.maxDownloads : null,
       downloadCount: 0,
-      oneTime: false,     // Unlimited downloads
-      passwordProtected: data.passwordProtected,
+      oneTime: Boolean(data.oneTime),
+      passwordProtected: Boolean(data.passwordProtected),
       passwordHash: data.passwordHash,
       status: "active",
       createdAt: now,
@@ -388,6 +442,15 @@ export const payloadStore = {
       return { share: null, status: "expired" };
     }
 
+    // Check download limit
+    if (share.maxDownloads !== null && share.downloadCount >= share.maxDownloads) {
+      if (share.status === "active") {
+        share.status = "download-limit-reached";
+        saveStore();
+      }
+      return { share: null, status: "download-limit-reached" };
+    }
+
     if (share.status !== "active") {
       return { share: null, status: share.status };
     }
@@ -397,6 +460,7 @@ export const payloadStore = {
 
   async accessShare(
     shareCode: string,
+    accessorWallet?: string,
     passwordInput?: string
   ): Promise<{
     success: boolean;
@@ -404,7 +468,7 @@ export const payloadStore = {
     manifest?: PayloadManifest | null;
     chunks?: PayloadChunk[];
     error?: string;
-    status?: ShareStatus | "not-found";
+    status?: ShareStatus | "not-found" | "unauthorized";
   }> {
     loadStore();
     const { share, status } = this.lookupShareByCode(shareCode);
@@ -412,7 +476,26 @@ export const payloadStore = {
       return { success: false, status, error: `Share status: ${status}` };
     }
 
-    // If password protected, verify password
+    // Recipient-specific E2EE Authorization Check
+    if (share.recipientUserId) {
+      if (!accessorWallet) {
+        return {
+          success: false,
+          status: "unauthorized",
+          error: "Recipient authentication required. Please connect the designated wallet to access this file.",
+        };
+      }
+
+      if (accessorWallet.toLowerCase() !== share.recipientUserId.toLowerCase()) {
+        return {
+          success: false,
+          status: "unauthorized",
+          error: `Access denied. This file was encrypted specifically for ${share.recipientUserId.slice(0, 6)}...${share.recipientUserId.slice(-4)}. Your connected wallet (${accessorWallet.slice(0, 6)}...${accessorWallet.slice(-4)}) is not authorized.`,
+        };
+      }
+    }
+
+    // Check password if set
     if (share.passwordProtected) {
       if (!passwordInput) {
         return {
@@ -431,9 +514,25 @@ export const payloadStore = {
       }
     }
 
-    // Validated! Increment download count
+    // Check download limit
+    if (share.maxDownloads !== null && share.downloadCount >= share.maxDownloads) {
+      share.status = "download-limit-reached";
+      saveStore();
+      return {
+        success: false,
+        status: "download-limit-reached",
+        error: "Download limit reached for this share.",
+      };
+    }
+
+    // Increment download count
     share.downloadCount += 1;
     share.lastAccessedAt = new Date().toISOString();
+
+    // If one-time access, revoke after this download
+    if (share.oneTime) {
+      share.status = "download-limit-reached";
+    }
 
     saveStore();
 

@@ -33,7 +33,11 @@ export async function getPayloadAuth(
   }
 
   // Check x-wallet-address or x-owner-wallet header for Web3 wallets
-  const walletHeader = req.headers.get("x-wallet-address") || req.headers.get("x-owner-wallet") || req.headers.get("x-user-address");
+  const walletHeader =
+    req.headers.get("x-wallet-address") ||
+    req.headers.get("x-owner-wallet") ||
+    req.headers.get("x-user-address") ||
+    req.headers.get("x-payload-wallet");
   if (walletHeader && /^0x[a-fA-F0-9]{40}$/i.test(walletHeader.trim())) {
     const address = walletHeader.trim().toLowerCase();
     payloadStore.findOrCreateUser(address, "Web3-Wallet");
@@ -110,8 +114,16 @@ export const payloadService = {
     fileSize?: number;
     mimeType?: string;
     manifestCID?: string;
+    recipientUserId?: string;
+    recipientPublicKeyFingerprint?: string;
+    encryptedFileKey?: string;
+    keyAgreementMetadata?: import("@/payload/types").KeyAgreementMetadata;
+    isQuickShare?: boolean;
+    quickShareEnvelope?: string;
     expiresAt: string | null;
-    passwordProtected: boolean;
+    maxDownloads?: number | null;
+    oneTime?: boolean;
+    passwordProtected?: boolean;
     passwordHash?: string;
   }) {
     return payloadStore.createShare(data);
@@ -125,12 +137,24 @@ export const payloadService = {
     return payloadStore.lookupShareByCode(shareCode);
   },
 
-  accessShare(shareCode: string, passwordInput?: string) {
-    return payloadStore.accessShare(shareCode, passwordInput);
+  accessShare(shareCode: string, accessorWallet?: string, passwordInput?: string) {
+    return payloadStore.accessShare(shareCode, accessorWallet, passwordInput);
   },
 
   revokeShare(shareId: string, ownerWallet: string) {
     return payloadStore.revokeShare(shareId, ownerWallet);
+  },
+
+  registerUserPublicKey(walletAddress: string, publicKeyHex: string, fingerprint: string) {
+    return payloadStore.registerUserPublicKey(walletAddress, publicKeyHex, fingerprint);
+  },
+
+  getUser(walletAddress: string) {
+    return payloadStore.getUserByWallet(walletAddress);
+  },
+
+  listUsers() {
+    return payloadStore.listRegisteredUsers();
   },
 };
 
