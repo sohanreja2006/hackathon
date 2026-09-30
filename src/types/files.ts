@@ -2,7 +2,7 @@
  * CYBER-10 Phase 4 — File Metadata Types
  *
  * These types define the shape of encrypted file records.
- * Phase 5 will persist these to Supabase.
+ * SecureVault persists these to the Payload Backend Database.
  *
  * SECURITY NOTE:
  * The AES encryption key MUST NOT appear in any of these records.
@@ -10,7 +10,7 @@
  */
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Phase 4 Upload Types (in-memory, returned by the upload endpoint)
+// Upload Types (in-memory, returned by the upload endpoint)
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -36,9 +36,9 @@ export interface UploadErrorResponse {
 export type UploadApiResponse = UploadSuccessResponse | UploadErrorResponse;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Phase 5 Prep — File Record Interface (for Supabase in Phase 5)
+// File Record Interface (Stored in Payload CMS Collections)
 //
-// This interface defines what will be stored in the database.
+// This interface defines what is stored in the database.
 // Note: encryption_key is NOT included — keys stay with the user.
 // ─────────────────────────────────────────────────────────────────────────────
 
