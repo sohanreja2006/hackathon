@@ -8,15 +8,17 @@ const badgeVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-zinc-800 text-zinc-300 border border-zinc-700/60",
+          "bg-[#24272A] text-[#848C96] border border-[#3B4046]",
         cyber:
-          "bg-cyan-950/60 text-cyan-300 border border-cyan-500/30 shadow-xs shadow-cyan-500/10",
+          "bg-[#F6851B]/15 text-[#F6851B] border border-[#F6851B]/35 shadow-xs shadow-[#F6851B]/10",
+        metamask:
+          "bg-[#037DD6]/15 text-[#037DD6] border border-[#037DD6]/35",
         success:
-          "bg-emerald-950/60 text-emerald-300 border border-emerald-500/30",
+          "bg-emerald-950/60 text-emerald-400 border border-emerald-500/30",
         warning:
-          "bg-amber-950/60 text-amber-300 border border-amber-500/30",
+          "bg-amber-950/60 text-amber-400 border border-amber-500/30",
         outline:
-          "border border-zinc-700 text-zinc-300 bg-transparent",
+          "border border-[#3B4046] text-[#F2F4F6] bg-transparent",
         purple:
           "bg-purple-950/60 text-purple-300 border border-purple-500/30",
       },

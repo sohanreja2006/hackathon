@@ -42,15 +42,15 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   // 1. Initial Loading State
   if (!isMounted || isConnecting || isCheckingSession || isGoogleLoading) {
     return (
-      <div className="flex min-h-[70vh] flex-col items-center justify-center p-6 text-center">
-        <div className="relative mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-cyan-500/30 bg-zinc-900 shadow-lg shadow-cyan-500/10">
-          <Shield className="h-7 w-7 text-cyan-400 animate-pulse" />
+      <div className="flex min-h-[70vh] flex-col items-center justify-center p-6 text-center bg-[#141618]">
+        <div className="relative mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-[#F6851B]/40 bg-[#1E2024] shadow-lg shadow-[#F6851B]/10 text-2xl">
+          🦊
         </div>
-        <div className="font-mono text-sm text-zinc-300">
-          Checking Authentication Session...
+        <div className="font-mono text-sm text-[#F2F4F6] font-semibold">
+          Checking Sovereign Session...
         </div>
-        <p className="mt-1 text-xs text-zinc-500">
-          Validating sovereign credentials with zero-knowledge gateway
+        <p className="mt-1 text-xs text-[#848C96]">
+          Validating MetaMask credentials with zero-knowledge gateway
         </p>
       </div>
     );
@@ -62,31 +62,31 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
       <div className="mx-auto flex min-h-[75vh] max-w-lg flex-col items-center justify-center px-4 py-16 text-center animate-in fade-in duration-300">
         {/* Step indicator */}
         <div className="mb-6 flex items-center gap-2">
-          <div className="flex items-center gap-1.5 rounded-full border border-blue-500/30 bg-blue-950/40 px-3 py-1 text-xs font-mono text-blue-300">
-            <span className="flex h-1.5 w-1.5 rounded-full bg-blue-400 animate-ping" />
+          <div className="flex items-center gap-1.5 rounded-full border border-[#037DD6]/40 bg-[#037DD6]/10 px-3 py-1 text-xs font-mono text-[#037DD6] font-semibold">
+            <span className="flex h-1.5 w-1.5 rounded-full bg-[#037DD6] animate-ping" />
             <span>STEP 1 OF 2 · USER AUTHENTICATION</span>
           </div>
-          <div className="text-zinc-600 text-xs">→</div>
-          <div className="rounded-full border border-zinc-800 bg-zinc-900/60 px-2.5 py-1 text-xs font-mono text-zinc-500">
+          <div className="text-[#848C96] text-xs">→</div>
+          <div className="rounded-full border border-[#3B4046] bg-[#1E2024] px-2.5 py-1 text-xs font-mono text-[#848C96]">
             STEP 2: METAMASK
           </div>
         </div>
 
         <div className="relative mb-6">
-          <div className="absolute -inset-2 rounded-2xl bg-blue-500/10 blur-xl" />
-          <div className="relative flex h-20 w-20 items-center justify-center rounded-2xl border border-zinc-800 bg-zinc-900 shadow-2xl">
-            <User className="h-9 w-9 text-blue-400" />
-            <span className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-blue-500/20 border border-blue-500/40 text-[10px] text-blue-300 font-mono">
+          <div className="absolute -inset-2 rounded-2xl bg-[#037DD6]/10 blur-xl" />
+          <div className="relative flex h-20 w-20 items-center justify-center rounded-2xl border border-[#3B4046] bg-[#1E2024] shadow-2xl">
+            <User className="h-9 w-9 text-[#037DD6]" />
+            <span className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-[#037DD6]/20 border border-[#037DD6]/40 text-[10px] text-[#037DD6] font-mono font-bold">
               1
             </span>
           </div>
         </div>
 
         <div className="space-y-2 mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-100">
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
             Sign In with Google
           </h1>
-          <p className="text-sm text-zinc-400 leading-relaxed max-w-md">
+          <p className="text-xs text-[#848C96] leading-relaxed max-w-md">
             Sign in with your Google account to establish your workspace identity. Once verified, you will be prompted to connect your MetaMask wallet for decentralized cryptographic key management.
           </p>
         </div>
@@ -95,7 +95,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
           <button
             onClick={() => googleSignIn("/dashboard")}
             type="button"
-            className="w-full flex items-center justify-center gap-3 rounded-xl border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 hover:border-zinc-500 px-5 py-3.5 text-sm font-semibold text-zinc-100 shadow-lg shadow-zinc-950/60 active:scale-[0.99] transition-all"
+            className="w-full flex items-center justify-center gap-3 rounded-xl border border-[#3B4046] bg-[#24272A] hover:bg-[#2B2F34] hover:border-[#848C96] px-5 py-3.5 text-sm font-semibold text-white shadow-md active:scale-[0.99] transition-all"
           >
             <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" aria-hidden>
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
@@ -107,19 +107,19 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
           </button>
         </div>
 
-        <div className="w-full rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-4 text-left text-xs font-mono space-y-2 mb-6">
-          <div className="flex items-center gap-2 text-zinc-300">
-            <Shield className="h-3.5 w-3.5 text-blue-400 shrink-0" />
-            <span>Dual-Layer Security: Web2 Identity + Web3 Sovereign Cryptography</span>
+        <div className="w-full rounded-2xl border border-[#3B4046] bg-[#1E2024] p-4 text-left text-xs font-mono space-y-2 mb-6">
+          <div className="flex items-center gap-2 text-[#F2F4F6]">
+            <Shield className="h-3.5 w-3.5 text-[#037DD6] shrink-0" />
+            <span>Dual-Layer Security: Google OAuth + MetaMask Sovereign Signature</span>
           </div>
-          <div className="flex items-center gap-2 text-zinc-300">
-            <Lock className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
-            <span>Zero-Knowledge: Local browser-only decryption</span>
+          <div className="flex items-center gap-2 text-[#F2F4F6]">
+            <Lock className="h-3.5 w-3.5 text-[#F6851B] shrink-0" />
+            <span>Zero-Knowledge: Local browser AES-256 decryption only</span>
           </div>
         </div>
 
         <Link href="/">
-          <Button variant="ghost" size="sm" className="gap-1.5 text-xs text-zinc-400 hover:text-zinc-200">
+          <Button variant="ghost" size="sm" className="gap-1.5 text-xs text-[#848C96] hover:text-[#F2F4F6]">
             <ArrowLeft className="h-3.5 w-3.5" />
             <span>Back to Home</span>
           </Button>
@@ -139,38 +139,38 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
             <Check className="h-3 w-3 text-emerald-400" />
             <span>STEP 1: GOOGLE VERIFIED</span>
           </div>
-          <div className="text-zinc-500 text-xs">→</div>
-          <div className="flex items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-950/40 px-3 py-1 text-xs font-mono text-amber-300">
-            <span className="flex h-1.5 w-1.5 rounded-full bg-amber-400 animate-ping" />
+          <div className="text-[#848C96] text-xs">→</div>
+          <div className="flex items-center gap-1.5 rounded-full border border-[#F6851B]/40 bg-[#F6851B]/15 px-3 py-1 text-xs font-mono text-[#F6851B] font-bold">
+            <span className="flex h-1.5 w-1.5 rounded-full bg-[#F6851B] animate-ping" />
             <span>STEP 2 OF 2 · CONNECT METAMASK</span>
           </div>
         </div>
 
         {/* User Identity Pill */}
-        <div className="w-full rounded-xl border border-zinc-800 bg-zinc-900/60 p-3 mb-6 flex items-center justify-between text-xs">
+        <div className="w-full rounded-2xl border border-[#3B4046] bg-[#1E2024] p-3 mb-6 flex items-center justify-between text-xs">
           <div className="flex items-center gap-2.5 min-w-0">
             {googleUser.image ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={googleUser.image}
                 alt={googleUser.name ?? "Google"}
-                className="h-7 w-7 rounded-full border border-zinc-700 shrink-0"
+                className="h-7 w-7 rounded-full border border-[#3B4046] shrink-0"
                 referrerPolicy="no-referrer"
               />
             ) : (
-              <div className="h-7 w-7 rounded-full bg-gradient-to-br from-blue-500 to-violet-500 flex items-center justify-center text-white text-[10px] font-bold shrink-0">
+              <div className="h-7 w-7 rounded-full bg-[#037DD6] flex items-center justify-center text-white text-[10px] font-bold shrink-0">
                 {googleUser.name?.[0] ?? "G"}
               </div>
             )}
             <div className="flex flex-col text-left min-w-0">
-              <span className="font-semibold text-zinc-200 truncate">{googleUser.name}</span>
-              <span className="text-[10px] text-zinc-400 font-mono truncate">{googleUser.email}</span>
+              <span className="font-semibold text-white truncate">{googleUser.name}</span>
+              <span className="text-[10px] text-[#848C96] font-mono truncate">{googleUser.email}</span>
             </div>
           </div>
           <button
             onClick={() => googleSignOut("/dashboard")}
             type="button"
-            className="flex items-center gap-1 text-[11px] text-zinc-400 hover:text-rose-400 transition-colors ml-2 shrink-0"
+            className="flex items-center gap-1 text-[11px] text-[#848C96] hover:text-rose-400 transition-colors ml-2 shrink-0"
             title="Switch account"
           >
             <LogOut className="h-3 w-3" />
@@ -179,18 +179,17 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
         </div>
 
         <div className="relative mb-6">
-          <div className="absolute -inset-2 rounded-2xl bg-cyan-500/10 blur-xl" />
-          <div className="relative flex h-20 w-20 items-center justify-center rounded-2xl border border-zinc-800 bg-zinc-900 shadow-2xl">
-            <Lock className="h-9 w-9 text-cyan-400" />
-            <span className="text-xl absolute -bottom-1 -right-1">🦊</span>
+          <div className="absolute -inset-2 rounded-2xl bg-[#F6851B]/10 blur-xl" />
+          <div className="relative flex h-20 w-20 items-center justify-center rounded-2xl border border-[#F6851B]/40 bg-[#1E2024] shadow-2xl text-4xl">
+            🦊
           </div>
         </div>
 
         <div className="space-y-2 mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-100">
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
             Connect MetaMask Wallet
           </h1>
-          <p className="text-sm text-zinc-400 leading-relaxed max-w-md">
+          <p className="text-xs text-[#848C96] leading-relaxed max-w-md">
             Google authentication verified. Now connect your MetaMask wallet to unlock your decentralized storage vault, access your client-encrypted files, and sign cryptographic operations.
           </p>
         </div>
@@ -199,19 +198,19 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
           <WalletConnectButton size="lg" className="w-full sm:w-auto min-w-[220px]" />
         </div>
 
-        <div className="w-full rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-4 text-left text-xs font-mono space-y-2 mb-6">
-          <div className="flex items-center gap-2 text-zinc-300">
+        <div className="w-full rounded-2xl border border-[#3B4046] bg-[#1E2024] p-4 text-left text-xs font-mono space-y-2 mb-6">
+          <div className="flex items-center gap-2 text-[#F2F4F6]">
             <Shield className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
             <span>Non-custodial: Private keys never leave your browser</span>
           </div>
-          <div className="flex items-center gap-2 text-zinc-300">
-            <KeyRound className="h-3.5 w-3.5 text-cyan-400 shrink-0" />
+          <div className="flex items-center gap-2 text-[#F2F4F6]">
+            <KeyRound className="h-3.5 w-3.5 text-[#F6851B] shrink-0" />
             <span>EIP-4361 Sovereign Signatures for cryptographic access</span>
           </div>
         </div>
 
         <Link href="/">
-          <Button variant="ghost" size="sm" className="gap-1.5 text-xs text-zinc-400 hover:text-zinc-200">
+          <Button variant="ghost" size="sm" className="gap-1.5 text-xs text-[#848C96] hover:text-[#F2F4F6]">
             <ArrowLeft className="h-3.5 w-3.5" />
             <span>Back to Home</span>
           </Button>
@@ -235,50 +234,50 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
             <Check className="h-3 w-3 text-emerald-400" />
             <span>GOOGLE VERIFIED</span>
           </div>
-          <div className="text-zinc-500 text-xs">→</div>
-          <div className="flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-950/40 px-3 py-1 text-xs font-mono text-amber-300">
-            <span className="flex h-1.5 w-1.5 rounded-full bg-amber-400 animate-ping" />
+          <div className="text-[#848C96] text-xs">→</div>
+          <div className="flex items-center gap-1.5 rounded-full border border-[#F6851B]/40 bg-[#F6851B]/15 px-3 py-1 text-xs font-mono text-[#F6851B] font-bold">
+            <span className="flex h-1.5 w-1.5 rounded-full bg-[#F6851B] animate-ping" />
             <span>SIGNATURE REQUIRED</span>
           </div>
         </div>
 
         <div className="relative mb-6">
-          <div className="absolute -inset-2 rounded-2xl bg-amber-500/10 blur-xl" />
-          <div className="relative flex h-20 w-20 items-center justify-center rounded-2xl border border-amber-500/30 bg-zinc-900 shadow-2xl">
-            <KeyRound className="h-9 w-9 text-amber-400" />
-            <span className="absolute -top-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-cyan-500/20 border border-cyan-500/40 text-[10px] text-cyan-300 font-mono">
-              EIP
+          <div className="absolute -inset-2 rounded-2xl bg-[#F6851B]/10 blur-xl" />
+          <div className="relative flex h-20 w-20 items-center justify-center rounded-2xl border border-[#F6851B]/40 bg-[#1E2024] shadow-2xl">
+            <KeyRound className="h-9 w-9 text-[#F6851B]" />
+            <span className="absolute -top-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-[#F6851B]/20 border border-[#F6851B]/40 text-[10px] text-[#F6851B] font-mono font-bold">
+              SIWE
             </span>
           </div>
         </div>
 
         <div className="space-y-2 mb-6">
-          <div className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-950/40 px-3 py-1 text-xs font-mono text-amber-300">
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-[#F6851B]/40 bg-[#F6851B]/15 px-3 py-1 text-xs font-mono text-[#F6851B] font-semibold">
             <AlertTriangle className="h-3.5 w-3.5" />
             VERIFY WALLET OWNERSHIP
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-100">
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
             Verify MetaMask Signature
           </h1>
-          <p className="text-sm text-zinc-400 leading-relaxed max-w-md">
-            Sign a cryptographic challenge (EIP-4361 / SIWE) with your connected wallet to prove ownership and unlock the vault.
+          <p className="text-xs text-[#848C96] leading-relaxed max-w-md">
+            Sign a cryptographic challenge (EIP-4361 / SIWE) with your connected MetaMask wallet to prove ownership and unlock the vault.
           </p>
         </div>
 
         {/* Connected Address Indicator */}
-        <div className="w-full rounded-xl border border-zinc-800 bg-zinc-900/60 p-3 mb-6 flex items-center justify-between text-xs font-mono">
-          <div className="flex items-center gap-2 text-zinc-400">
+        <div className="w-full rounded-2xl border border-[#3B4046] bg-[#1E2024] p-3.5 mb-6 flex items-center justify-between text-xs font-mono">
+          <div className="flex items-center gap-2 text-[#848C96]">
             <span className="h-2 w-2 rounded-full bg-emerald-400" />
             <span>Connected Wallet:</span>
           </div>
-          <span className="text-cyan-300 font-semibold">
+          <span className="text-[#F6851B] font-semibold">
             {formatAddress(address, 6)}
           </span>
         </div>
 
         {/* Error Banner if user rejected or verification failed */}
         {authError && (
-          <div className="w-full mb-6 rounded-xl border border-rose-500/40 bg-rose-950/30 p-4 text-left text-xs font-mono text-rose-300 flex items-start gap-2.5 animate-in slide-in-from-top-1 duration-200">
+          <div className="w-full mb-6 rounded-2xl border border-rose-500/40 bg-rose-950/30 p-4 text-left text-xs font-mono text-rose-300 flex items-start gap-2.5 animate-in slide-in-from-top-1 duration-200">
             <AlertTriangle className="h-4 w-4 shrink-0 text-rose-400 mt-0.5" />
             <div className="flex-1">
               <div className="font-semibold text-rose-200">Authentication Failed</div>
@@ -289,12 +288,10 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
         {/* Primary SIWE Sign-In Button */}
         <div className="w-full flex flex-col gap-3 mb-8">
-          <Button
-            size="lg"
-            variant="cyber"
+          <button
             onClick={() => signInWithWallet()}
             disabled={isWorking}
-            className="w-full gap-2 text-base font-semibold py-6 shadow-lg shadow-cyan-950/50"
+            className="w-full flex items-center justify-center gap-2 text-sm font-bold py-3.5 rounded-xl bg-[#F6851B] hover:bg-[#E2761B] text-white shadow-md transition-all active:scale-[0.98] disabled:opacity-50"
           >
             {authStage === "requesting_nonce" && (
               <>
@@ -305,7 +302,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
             {authStage === "awaiting_signature" && (
               <>
                 <Loader2 className="h-5 w-5 animate-spin" />
-                <span>Sign Message in Your Wallet...</span>
+                <span>Sign Message in MetaMask...</span>
               </>
             )}
             {authStage === "verifying" && (
@@ -319,28 +316,28 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
               authStage !== "verifying" && (
                 <>
                   <KeyRound className="h-5 w-5" />
-                  <span>Sign In With Wallet</span>
+                  <span>Sign In With MetaMask</span>
                 </>
               )}
-          </Button>
+          </button>
 
           <Button
             variant="ghost"
             size="sm"
             onClick={() => disconnect()}
-            className="text-xs text-zinc-500 hover:text-zinc-300"
+            className="text-xs text-[#848C96] hover:text-[#F2F4F6]"
           >
             Disconnect & Switch Wallet
           </Button>
         </div>
 
         {/* Cryptographic Security Details */}
-        <div className="w-full rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-4 text-left text-xs font-mono space-y-2.5">
-          <div className="flex items-center gap-2 text-zinc-300">
-            <CheckCircle2 className="h-3.5 w-3.5 text-cyan-400 shrink-0" />
+        <div className="w-full rounded-2xl border border-[#3B4046] bg-[#1E2024] p-4 text-left text-xs font-mono space-y-2.5">
+          <div className="flex items-center gap-2 text-[#F2F4F6]">
+            <CheckCircle2 className="h-3.5 w-3.5 text-[#F6851B] shrink-0" />
             <span>Gas-free off-chain signature (EIP-4361 / SIWE)</span>
           </div>
-          <div className="flex items-center gap-2 text-zinc-300">
+          <div className="flex items-center gap-2 text-[#F2F4F6]">
             <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
             <span>Anti-replay protection: Single-use server nonce</span>
           </div>
