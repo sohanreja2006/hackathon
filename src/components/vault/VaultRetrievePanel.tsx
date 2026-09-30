@@ -94,7 +94,10 @@ export function VaultRetrievePanel() {
         size: decrypted.plainBlob.size,
       });
       setStage("done");
-      setStatusMessage("Decryption complete.");
+      setStatusMessage("Decryption complete. Downloading file...");
+
+      // Automatically trigger browser file download
+      downloadBlob(decrypted.plainBlob, decrypted.originalName);
     } catch (err: unknown) {
       const msg =
         err instanceof Error ? err.message : "Decryption failed.";

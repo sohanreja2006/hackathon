@@ -20,6 +20,8 @@
  *   [remaining bytes] = AES-256-GCM ciphertext + 128-bit GCM auth tag (appended by Web Crypto)
  */
 
+import { fetchFromIpfs } from "@/lib/ipfs/gateway";
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
@@ -313,20 +315,24 @@ export async function decryptFile(
   };
 }
 
-/** Trigger a browser download for any Blob */
+/** Trigger a browser download for any Blob with cross-browser compatibility */
 export function downloadBlob(blob: Blob, filename: string): void {
-  const url = URL.createObjectURL(blob);
+  if (typeof window === "undefined") return;
+  const url = window.URL.createObjectURL(blob);
   const a = document.createElement("a");
+  a.style.display = "none";
   a.href = url;
   a.download = filename;
-  a.style.display = "none";
+  a.rel = "noopener noreferrer";
   document.body.appendChild(a);
   a.click();
-  // Clean up after a short delay
+  // Clean up after download triggers
   setTimeout(() => {
-    URL.revokeObjectURL(url);
-    document.body.removeChild(a);
-  }, 1000);
+    if (document.body.contains(a)) {
+      document.body.removeChild(a);
+    }
+    window.URL.revokeObjectURL(url);
+  }, 5000);
 }
 
 /** Format bytes to a human-readable string */
@@ -448,27 +454,20 @@ export async function decryptKeyForRecipient(
 
 /**
  * 1-Click Decrypt & Download from IPFS (FR-5):
- * Fetches ciphertext from IPFS gateway, decrypts in-memory, and triggers file download.
+ * Fetches ciphertext from IPFS gateway with multi-gateway failover, decrypts in-memory,
+ * and triggers file download automatically.
  */
 export async function downloadAndDecryptFromIpfs(
   cid: string,
   keyHex: string,
-  gatewayUrl = "https://gateway.pinata.cloud",
+  _gatewayUrl?: string,
   onProgress?: (msg: string) => void
 ): Promise<DecryptedFileBundle> {
-  onProgress?.("Fetching ciphertext from IPFS gateway...");
-  const cleanGateway = gatewayUrl.replace(/\/+$/, "");
-  const res = await fetch(`${cleanGateway}/ipfs/${cid}`);
-  if (!res.ok) {
-    throw new Error(
-      `Failed to fetch from IPFS (${res.status} ${res.statusText}). Gateway may still be propagating.`
-    );
-  }
-
-  onProgress?.("Reading encrypted binary payload...");
-  const blob = await res.blob();
+  onProgress?.("Fetching ciphertext from IPFS network...");
+  const rawBuffer = await fetchFromIpfs(cid);
 
   onProgress?.("Decrypting AES-256-GCM in browser...");
+  const blob = new Blob([rawBuffer], { type: "application/octet-stream" });
   const decrypted = await decryptFile(blob, keyHex, (p) => {
     onProgress?.(p.message);
   });
