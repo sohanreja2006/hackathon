@@ -69,7 +69,9 @@ const FALLBACK_GATEWAYS = [
 ];
 
 /**
- * Fetch encrypted bytes from IPFS with automatic multi-gateway failover.
+ * Fetch encrypted bytes from IPFS.
+ * Prioritizes the same-origin server proxy (/api/files/download) to eliminate browser CORS errors,
+ * with automatic failover to public IPFS gateways.
  * Returns the raw ArrayBuffer — decryption happens in the browser.
  */
 export async function fetchFromIpfs(cid: string): Promise<ArrayBuffer> {
@@ -77,8 +79,19 @@ export async function fetchFromIpfs(cid: string): Promise<ArrayBuffer> {
     throw new Error(`Invalid CID format: "${cid}"`);
   }
 
+  // 1. First priority: Same-origin API proxy (bypasses browser CORS & Cloudflare blocks)
+  try {
+    const proxyUrl = `/api/files/download?cid=${encodeURIComponent(cid)}`;
+    const proxyRes = await fetch(proxyUrl);
+    if (proxyRes.ok) {
+      return await proxyRes.arrayBuffer();
+    }
+  } catch {
+    // If running in an environment where internal proxy is unreachable, fall back to gateways
+  }
+
+  // 2. Second priority: Public IPFS gateways with CORS
   const primaryGateway = getGatewayBase();
-  // Build ordered list of unique gateways starting with the configured primary
   const gateways = Array.from(
     new Set([primaryGateway, ...FALLBACK_GATEWAYS])
   ).map((g) => g.replace(/\/+$/, ""));
@@ -89,7 +102,7 @@ export async function fetchFromIpfs(cid: string): Promise<ArrayBuffer> {
     const url = `${gateway}/ipfs/${cid}`;
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s per gateway
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
 
       const res = await fetch(url, {
         method: "GET",
@@ -107,5 +120,5 @@ export async function fetchFromIpfs(cid: string): Promise<ArrayBuffer> {
     }
   }
 
-  throw lastError || new Error(`Could not fetch CID ${cid} from any IPFS gateway. It may still be propagating.`);
+  throw lastError || new Error(`Could not fetch CID ${cid} from IPFS network.`);
 }
