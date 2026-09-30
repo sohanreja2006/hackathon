@@ -21,6 +21,7 @@ import { OwlCompanion, OwlState } from "@/components/ui/OwlCompanion";
 import { formatShareCodeInput, isValidShareCodeFormat } from "@/lib/shareCode";
 import { lookupSecureShare, accessSecureShare } from "@/lib/payloadClient";
 import { getIpfsUrl, fetchFromIpfs } from "@/lib/ipfs/gateway";
+import { getAllVaultFiles } from "@/lib/fileStorage";
 
 interface ReceiveSecureFileModalProps {
   isOpen: boolean;
@@ -70,6 +71,52 @@ export function ReceiveSecureFileModal({
 
   // Dynamic Owl State
   const [owlState, setOwlState] = useState<OwlState>("idle");
+
+  // Cleaned AES-256 key input
+  const cleanKey = keyInput.trim().replace(/^0x/i, "").replace(/[\s\-:]/g, "");
+
+  // Auto-detect zero-knowledge key from URL hash or query param (#key=... or ?key=...)
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const hash = window.location.hash;
+      const urlParams = new URLSearchParams(window.location.search);
+      const keyFromUrl = urlParams.get("key");
+      const match = hash.match(/key=([0-9a-fA-F]{64})/i) || hash.match(/#([0-9a-fA-F]{64})/i);
+      const foundKey = match ? match[1] : (keyFromUrl && /^[0-9a-fA-F]{64}$/.test(keyFromUrl) ? keyFromUrl : null);
+      if (foundKey) {
+        setKeyInput(foundKey);
+      }
+    }
+  }, []);
+
+  // Look for a matching encrypted file in this browser's local vault
+  const matchingLocalFile = React.useMemo(() => {
+    if (!foundShare || typeof window === "undefined") return null;
+    try {
+      const vaultFiles = getAllVaultFiles();
+      return (
+        vaultFiles.find((f) => {
+          if (!f.keyHex) return false;
+          if (foundShare.manifestCID && (f.manifestCID === foundShare.manifestCID || f.cid === foundShare.manifestCID)) {
+            return true;
+          }
+          if (f.fileName === foundShare.fileName && Math.abs(f.fileSize - foundShare.fileSize) < 100) {
+            return true;
+          }
+          return false;
+        }) || null
+      );
+    } catch {
+      return null;
+    }
+  }, [foundShare]);
+
+  // Auto-fill key if local match exists and input is empty
+  useEffect(() => {
+    if (matchingLocalFile?.keyHex && !keyInput) {
+      setKeyInput(matchingLocalFile.keyHex);
+    }
+  }, [matchingLocalFile]);
 
   useEffect(() => {
     if (initialCode) {
@@ -133,14 +180,24 @@ export function ReceiveSecureFileModal({
       return;
     }
 
-    const key = keyInput.trim();
-    if (!key) {
+    const keyToUse = cleanKey;
+    if (!keyToUse) {
       setKeyError("Please enter the 64-character AES-256 decryption key provided by the owner.");
       return;
     }
 
-    if (key.length !== 64 || !/^[0-9a-fA-F]{64}$/.test(key)) {
-      setKeyError("Invalid key format: AES key must be exactly 64 hexadecimal characters.");
+    if (keyToUse.length !== 64 || !/^[0-9a-fA-F]{64}$/.test(keyToUse)) {
+      if (keyToUse.length < 64) {
+        setKeyError(
+          `Incomplete key: entered ${keyToUse.length} of 64 hex characters. The AES key is a 64-character hex string generated during file encryption (different from the share password).`
+        );
+      } else if (keyToUse.length > 64) {
+        setKeyError(
+          `Invalid key length: ${keyToUse.length} characters (expected 64). Please check for extra characters or spaces.`
+        );
+      } else {
+        setKeyError("Invalid key format: AES key must contain only hexadecimal characters (0-9, a-f).");
+      }
       return;
     }
 
@@ -227,7 +284,7 @@ export function ReceiveSecureFileModal({
 
       const decrypted = await downloadAndDecryptFromIpfs(
         targetCid,
-        key,
+        keyToUse,
         undefined,
         (msg) => setProgressMessage(msg)
       );
@@ -419,29 +476,64 @@ export function ReceiveSecureFileModal({
                       <label className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                         <KeyRound className="h-3.5 w-3.5 text-[#2563EB]" />
                         <span>AES-256 Decryption Key</span>
+                        {cleanKey.length > 0 && (
+                          <span
+                            className={`text-[10px] font-mono font-semibold ${
+                              cleanKey.length === 64 ? "text-emerald-600" : "text-amber-600"
+                            }`}
+                          >
+                            ({cleanKey.length}/64)
+                          </span>
+                        )}
                       </label>
-                      <button
-                        type="button"
-                        onClick={() => setShowKeyInput(!showKeyInput)}
-                        className="text-[11px] text-slate-400 hover:text-slate-600"
-                      >
-                        {showKeyInput ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        {matchingLocalFile?.keyHex && cleanKey !== matchingLocalFile.keyHex && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setKeyInput(matchingLocalFile.keyHex!);
+                              setKeyError(null);
+                            }}
+                            className="text-[10px] font-semibold text-[#2563EB] hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded-md transition-colors"
+                          >
+                            Fill from Vault
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setShowKeyInput(!showKeyInput)}
+                          className="text-[11px] text-slate-400 hover:text-slate-600 flex items-center gap-1"
+                        >
+                          {showKeyInput ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                          <span>{showKeyInput ? "Hide" : "Show"}</span>
+                        </button>
+                      </div>
                     </div>
 
                     <input
                       type={showKeyInput ? "text" : "password"}
                       value={keyInput}
                       onChange={(e) => {
-                        setKeyInput(e.target.value.trim());
+                        setKeyInput(e.target.value);
                         setKeyError(null);
                       }}
                       placeholder="Paste 64-character hexadecimal key provided by sender..."
                       className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs text-slate-900 focus:bg-white focus:border-[#2563EB] focus:outline-none"
                     />
 
-                    {keyError && (
-                      <p className="text-[11px] text-rose-600 font-semibold">{keyError}</p>
+                    {matchingLocalFile?.keyHex && cleanKey === matchingLocalFile.keyHex && (
+                      <div className="flex items-center gap-1.5 text-[10px] text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                        <Check className="h-3 w-3 shrink-0" />
+                        <span>Decryption key automatically matched from your local vault file history.</span>
+                      </div>
+                    )}
+
+                    {keyError ? (
+                      <p className="text-[11px] text-rose-600 font-semibold leading-relaxed">{keyError}</p>
+                    ) : (
+                      <p className="text-[10px] text-slate-400">
+                        The 64-character AES key was created when the owner encrypted this file. It is required to reconstruct the plaintext on your machine.
+                      </p>
                     )}
                   </div>
 

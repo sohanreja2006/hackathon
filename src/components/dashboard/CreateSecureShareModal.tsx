@@ -15,6 +15,8 @@ import {
   AlertCircle,
   Share2,
   Sparkles,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { formatBytes } from "@/lib/crypto";
 import { OwlCompanion } from "@/components/ui/OwlCompanion";
@@ -48,6 +50,8 @@ export function CreateSecureShareModal({
   const [createdShare, setCreatedShare] = useState<PayloadShare | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedKey, setCopiedKey] = useState(false);
+  const [showShareKey, setShowShareKey] = useState(false);
 
   if (!isOpen || !file) return null;
 
@@ -96,10 +100,18 @@ export function CreateSecureShareModal({
     setTimeout(() => setCopiedCode(false), 2000);
   };
 
+  const handleCopyKey = () => {
+    if (!file?.keyHex) return;
+    navigator.clipboard.writeText(file.keyHex);
+    setCopiedKey(true);
+    setTimeout(() => setCopiedKey(false), 2000);
+  };
+
   const handleCopyShareLink = () => {
     if (!createdShare) return;
     const origin = typeof window !== "undefined" ? window.location.origin : "";
-    const url = `${origin}/receive?code=${createdShare.shareCode}`;
+    const keyHash = file?.keyHex ? `#key=${file.keyHex}` : "";
+    const url = `${origin}/receive?code=${createdShare.shareCode}${keyHash}`;
     navigator.clipboard.writeText(url);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2000);
@@ -110,6 +122,7 @@ export function CreateSecureShareModal({
     setError(null);
     setPasswordProtected(false);
     setPassword("");
+    setShowShareKey(false);
     onClose();
   };
 
@@ -283,6 +296,42 @@ export function CreateSecureShareModal({
                   {createdShare.shareCode}
                 </div>
               </div>
+
+              {/* AES-256 Decryption Key Display */}
+              {file.keyHex && (
+                <div className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50 space-y-2 text-left">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                      <KeyRound className="h-3.5 w-3.5 text-[#2563EB]" />
+                      <span>AES-256 Decryption Key</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowShareKey(!showShareKey)}
+                        className="text-[11px] text-slate-500 hover:text-slate-800 flex items-center gap-1"
+                      >
+                        {showShareKey ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                        <span>{showShareKey ? "Hide" : "Show"}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCopyKey}
+                        className="text-[11px] font-semibold text-[#2563EB] hover:text-blue-700 flex items-center gap-1 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded-md transition-colors"
+                      >
+                        {copiedKey ? <Check className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3" />}
+                        <span>{copiedKey ? "Copied" : "Copy Key"}</span>
+                      </button>
+                    </div>
+                  </div>
+                  <div className="font-mono text-xs text-slate-800 bg-white p-2 rounded-xl border border-slate-200 break-all select-all font-medium">
+                    {showShareKey ? file.keyHex : `${file.keyHex.slice(0, 8)}••••••••••••••••••••••••••••••••••••••••••••••••${file.keyHex.slice(-8)}`}
+                  </div>
+                  <p className="text-[10px] text-slate-500">
+                    The recipient needs this AES key to decrypt locally. &ldquo;Copy Link&rdquo; embeds this key into a zero-knowledge URL hash so the recipient can decrypt automatically.
+                  </p>
+                </div>
+              )}
 
               {/* Stats & Rules Overview */}
               <div className="grid grid-cols-2 gap-2 text-left">
