@@ -5,12 +5,13 @@ import { formatShareCodeInput } from "@/lib/shareCode";
 /**
  * POST /api/payload/shares/access
  * Recipient validates password (if required) and retrieves manifest & chunk CIDs + SHA-256 hashes.
- * Increments download count and updates share status.
+ * Increments download count and returns file payload references.
  */
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { code, password } = body;
+    const code = body.code || body.shareCode;
+    const password = body.password;
 
     const normalizedCode = formatShareCodeInput(code || "");
     if (!normalizedCode) {
@@ -43,16 +44,6 @@ export async function POST(req: NextRequest) {
           { status: 410 }
         );
       }
-      if (result.status === "download-limit-reached") {
-        return NextResponse.json(
-          {
-            success: false,
-            status: "download-limit-reached",
-            error: "Download limit reached. This secure share is no longer available.",
-          },
-          { status: 410 }
-        );
-      }
       return NextResponse.json(
         {
           success: false,
@@ -64,7 +55,6 @@ export async function POST(req: NextRequest) {
 
     const { share, manifest, chunks } = result;
 
-    // Return manifest & chunk metadata needed for browser-side IPFS download and SHA-256 verification
     return NextResponse.json({
       success: true,
       file: {

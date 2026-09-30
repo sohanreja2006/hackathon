@@ -32,6 +32,14 @@ export async function getPayloadAuth(
     return { walletAddress: address.toLowerCase() };
   }
 
+  // Check x-wallet-address or x-owner-wallet header for Web3 wallets
+  const walletHeader = req.headers.get("x-wallet-address") || req.headers.get("x-owner-wallet") || req.headers.get("x-user-address");
+  if (walletHeader && /^0x[a-fA-F0-9]{40}$/i.test(walletHeader.trim())) {
+    const address = walletHeader.trim().toLowerCase();
+    payloadStore.findOrCreateUser(address, "Web3-Wallet");
+    return { walletAddress: address };
+  }
+
   return null;
 }
 
@@ -98,9 +106,11 @@ export const payloadService = {
   createShare(data: {
     fileId: string;
     ownerWallet: string;
+    fileName?: string;
+    fileSize?: number;
+    mimeType?: string;
+    manifestCID?: string;
     expiresAt: string | null;
-    maxDownloads: number | null;
-    oneTime: boolean;
     passwordProtected: boolean;
     passwordHash?: string;
   }) {

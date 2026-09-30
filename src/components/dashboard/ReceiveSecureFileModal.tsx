@@ -20,7 +20,7 @@ import { formatBytes, downloadAndDecryptFromIpfs } from "@/lib/crypto";
 import { OwlCompanion, OwlState } from "@/components/ui/OwlCompanion";
 import { formatShareCodeInput, isValidShareCodeFormat } from "@/lib/shareCode";
 import { lookupSecureShare, accessSecureShare } from "@/lib/payloadClient";
-import { getIpfsUrl } from "@/lib/ipfs/gateway";
+import { getIpfsUrl, fetchFromIpfs } from "@/lib/ipfs/gateway";
 
 interface ReceiveSecureFileModalProps {
   isOpen: boolean;
@@ -44,10 +44,10 @@ export function ReceiveSecureFileModal({
     fileName: string;
     fileSize: number;
     mimeType: string;
+    manifestCID?: string;
     encryptionAlgorithm: string;
     integrityAlgorithm: string;
     expiresAt: string | null;
-    downloadsRemaining: number | string;
     passwordProtected: boolean;
   } | null>(null);
 
@@ -182,13 +182,18 @@ export function ReceiveSecureFileModal({
           setProgressMessage(`Retrieving encrypted chunk ${i + 1} of ${totalChunks}...`);
           setChunkProgress({ current: i + 1, total: totalChunks });
 
-          // Fetch chunk buffer from IPFS
-          const gatewayUrl = getIpfsUrl(ch.cid);
-          const chunkRes = await fetch(gatewayUrl);
-          if (!chunkRes.ok) {
-            throw new Error(`Failed to fetch chunk ${i + 1} (${ch.cid}) from IPFS.`);
+          // Fetch chunk buffer from IPFS with multi-gateway failover
+          let chunkBuffer: ArrayBuffer;
+          try {
+            chunkBuffer = await fetchFromIpfs(ch.cid);
+          } catch {
+            const gatewayUrl = getIpfsUrl(ch.cid);
+            const chunkRes = await fetch(gatewayUrl);
+            if (!chunkRes.ok) {
+              throw new Error(`Failed to fetch chunk ${i + 1} (${ch.cid}) from IPFS.`);
+            }
+            chunkBuffer = await chunkRes.arrayBuffer();
           }
-          const chunkBuffer = await chunkRes.arrayBuffer();
 
           // Compute SHA-256 hash
           const hashBuffer = await crypto.subtle.digest("SHA-256", chunkBuffer);
@@ -210,7 +215,12 @@ export function ReceiveSecureFileModal({
       setOwlState("decrypting");
       setProgressMessage("All chunks verified! Decrypting locally in browser WebCrypto...");
 
-      const targetCid = file.manifestCID || chunks?.[0]?.cid || manifest?.manifestCID;
+      const targetCid =
+        file.manifestCID ||
+        foundShare?.manifestCID ||
+        chunks?.[0]?.cid ||
+        manifest?.manifestCID ||
+        (file as unknown as { cid?: string })?.cid;
       if (!targetCid) {
         throw new Error("Missing content CID for decryption.");
       }
@@ -375,7 +385,7 @@ export function ReceiveSecureFileModal({
                         <ShieldCheck className="h-3 w-3" /> Integrity Protected
                       </span>
                       <span className="inline-flex items-center gap-1 text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
-                        Downloads remaining: {foundShare.downloadsRemaining}
+                        Unlimited Access
                       </span>
                     </div>
                   </div>

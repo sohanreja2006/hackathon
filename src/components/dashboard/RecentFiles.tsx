@@ -1197,7 +1197,7 @@ export function RecentFiles() {
           isOpen={!!secureShareFile}
           onClose={() => setSecureShareFile(null)}
           file={secureShareFile}
-          vaultXId={vaultXIdentity?.id}
+          vaultXId={ownerKey}
           onShareCreated={() => {
             refreshFiles();
           }}

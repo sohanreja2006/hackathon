@@ -265,15 +265,47 @@ export const payloadStore = {
   createShare(data: {
     fileId: string;
     ownerWallet: string;
+    fileName?: string;
+    fileSize?: number;
+    mimeType?: string;
+    manifestCID?: string;
     expiresAt: string | null;
-    maxDownloads: number | null;
-    oneTime: boolean;
     passwordProtected: boolean;
     passwordHash?: string;
   }): PayloadShare | null {
     loadStore();
-    const file = this.getFileById(data.fileId, data.ownerWallet);
-    if (!file) return null;
+    let file = this.getFileById(data.fileId);
+    if (!file && data.manifestCID) {
+      file = Object.values(memoryDb.files).find(
+        (f) => f.manifestCID === data.manifestCID || f.id === data.fileId
+      ) || null;
+    }
+
+    const fileName = file?.originalName || data.fileName || "Encrypted File";
+    const fileSize = file?.size || data.fileSize || 0;
+    const mimeType = file?.mimeType || data.mimeType || "application/octet-stream";
+    const manifestCID = file?.manifestCID || data.manifestCID || "";
+
+    if (!file) {
+      file = {
+        id: data.fileId || `file_${Date.now()}`,
+        ownerWallet: data.ownerWallet.toLowerCase(),
+        originalName: fileName,
+        size: fileSize,
+        mimeType,
+        totalChunks: 1,
+        chunkSize: 8388608,
+        encryptionAlgorithm: "AES-256-GCM",
+        integrityAlgorithm: "SHA-256",
+        manifestCID,
+        uploadStatus: "completed",
+        integrityStatus: "verified",
+        logicalPath: `/vault/${data.ownerWallet}/${data.fileId}/`,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      memoryDb.files[file.id] = file;
+    }
 
     const shareId = `shr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     const shareCode = generateShareCode();
@@ -283,17 +315,17 @@ export const payloadStore = {
       id: shareId,
       shareCode,
       fileId: file.id,
-      fileName: file.originalName,
-      fileSize: file.size,
-      mimeType: file.mimeType,
+      fileName,
+      fileSize,
+      mimeType,
       ownerWallet: data.ownerWallet.toLowerCase(),
-      manifestCID: file.manifestCID || "",
+      manifestCID,
       encryptionAlgorithm: "AES-256-GCM",
       integrityAlgorithm: "SHA-256",
       expiresAt: data.expiresAt,
-      maxDownloads: data.maxDownloads,
+      maxDownloads: null, // Unlimited downloads
       downloadCount: 0,
-      oneTime: data.oneTime,
+      oneTime: false,     // Unlimited downloads
       passwordProtected: data.passwordProtected,
       passwordHash: data.passwordHash,
       status: "active",
@@ -311,7 +343,7 @@ export const payloadStore = {
     let hasUpdated = false;
 
     const results = Object.values(memoryDb.shares).filter((s) => {
-      if (s.fileId !== fileId) return false;
+      if (s.fileId !== fileId && s.manifestCID !== fileId) return false;
       if (expectedOwner && s.ownerWallet.toLowerCase() !== expectedOwner.toLowerCase()) {
         return false;
       }
@@ -354,15 +386,6 @@ export const payloadStore = {
         saveStore();
       }
       return { share: null, status: "expired" };
-    }
-
-    // Check download limit
-    if (share.maxDownloads !== null && share.downloadCount >= share.maxDownloads) {
-      if (share.status === "active") {
-        share.status = "download-limit-reached";
-        saveStore();
-      }
-      return { share: null, status: "download-limit-reached" };
     }
 
     if (share.status !== "active") {
@@ -412,14 +435,24 @@ export const payloadStore = {
     share.downloadCount += 1;
     share.lastAccessedAt = new Date().toISOString();
 
-    if (share.oneTime || (share.maxDownloads !== null && share.downloadCount >= share.maxDownloads)) {
-      share.status = "download-limit-reached";
-    }
-
     saveStore();
 
     const manifest = this.getManifestByFile(share.fileId);
-    const chunks = this.getChunksByFile(share.fileId);
+    let chunks = this.getChunksByFile(share.fileId);
+    if ((!chunks || chunks.length === 0) && manifest?.chunks && manifest.chunks.length > 0) {
+      chunks = manifest.chunks.map((mc, idx) => ({
+        id: `${share.fileId}_chunk_${idx}`,
+        fileId: share.fileId,
+        chunkIndex: mc.index,
+        chunkSize: mc.size || 8388608,
+        encryptedSize: mc.size || 8388608,
+        iv: mc.iv || "",
+        hash: mc.hash,
+        cid: mc.cid,
+        status: "uploaded",
+        uploadedAt: share.createdAt,
+      }));
+    }
 
     return {
       success: true,

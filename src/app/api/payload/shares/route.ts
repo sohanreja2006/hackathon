@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPayloadAuth, payloadService } from "@/lib/payload/client";
 import { computeExpiresAt, hashSharePassword } from "@/lib/shareCode";
-import { ShareExpirationOption, ShareDownloadLimitOption } from "@/payload/types";
+import { ShareExpirationOption } from "@/payload/types";
 
 /**
  * GET /api/payload/shares?fileId=...
@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
 
 /**
  * POST /api/payload/shares
- * Creates a new secure share code for a file.
+ * Creates a new secure share code for a file (unlimited downloads).
  */
 export async function POST(req: NextRequest) {
   try {
@@ -51,42 +51,26 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const {
       fileId,
+      fileName,
+      fileSize,
+      mimeType,
+      manifestCID,
+      cid,
       expirationOption = "24h",
-      downloadLimitOption = "1",
-      oneTime = false,
       passwordProtected = false,
       password = "",
     } = body;
 
-    if (!fileId) {
+    const resolvedFileId = fileId || cid || manifestCID;
+    if (!resolvedFileId) {
       return NextResponse.json(
-        { success: false, error: "fileId is required." },
+        { success: false, error: "fileId or CID is required to create a share." },
         { status: 400 }
-      );
-    }
-
-    const file = payloadService.getFile(fileId, auth.walletAddress);
-    if (!file) {
-      return NextResponse.json(
-        { success: false, error: "File not found or unauthorized." },
-        { status: 404 }
       );
     }
 
     // Calculate expiration
     const expiresAt = computeExpiresAt(expirationOption as ShareExpirationOption);
-
-    // Calculate max downloads
-    let maxDownloads: number | null = null;
-    if (downloadLimitOption !== "unlimited") {
-      const parsed = parseInt(downloadLimitOption, 10);
-      if (!isNaN(parsed) && parsed > 0) {
-        maxDownloads = parsed;
-      }
-    }
-    if (oneTime) {
-      maxDownloads = 1;
-    }
 
     // Hash password if enabled
     let passwordHash: string | undefined = undefined;
@@ -95,18 +79,20 @@ export async function POST(req: NextRequest) {
     }
 
     const newShare = payloadService.createShare({
-      fileId: file.id,
+      fileId: resolvedFileId,
       ownerWallet: auth.walletAddress,
+      fileName,
+      fileSize,
+      mimeType,
+      manifestCID: manifestCID || cid || "",
       expiresAt,
-      maxDownloads,
-      oneTime: Boolean(oneTime),
       passwordProtected: Boolean(passwordProtected && passwordHash),
       passwordHash,
     });
 
     if (!newShare) {
       return NextResponse.json(
-        { success: false, error: "Failed to create share code." },
+        { success: false, error: "Failed to generate share code." },
         { status: 500 }
       );
     }

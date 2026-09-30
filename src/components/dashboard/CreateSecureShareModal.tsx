@@ -39,10 +39,8 @@ export function CreateSecureShareModal({
 }: CreateSecureShareModalProps) {
   // Config state
   const [expirationOption, setExpirationOption] = useState<"never" | "1h" | "24h" | "7d" | "30d">("24h");
-  const [downloadLimitOption, setDownloadLimitOption] = useState<"1" | "5" | "10" | "unlimited">("1");
   const [passwordProtected, setPasswordProtected] = useState(false);
   const [password, setPassword] = useState("");
-  const [oneTime, setOneTime] = useState(false);
 
   // Flow & creation state
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -54,11 +52,6 @@ export function CreateSecureShareModal({
   if (!isOpen || !file) return null;
 
   const handleCreateShare = async () => {
-    if (!file.id) {
-      setError("This file does not have a registered backend ID. Please re-upload or select a synced vault file.");
-      return;
-    }
-
     if (passwordProtected && !password.trim()) {
       setError("Please enter a password or disable password protection.");
       return;
@@ -68,16 +61,22 @@ export function CreateSecureShareModal({
       setIsSubmitting(true);
       setError(null);
 
+      const targetId = file.id || file.cid || `file_${Date.now()}`;
+      const effectiveOwner = vaultXId || file.ownerAddress || undefined;
+
       const share = await createSecureShare(
         {
-          fileId: file.id,
+          fileId: targetId,
+          fileName: file.fileName || file.originalName,
+          fileSize: file.fileSize || 0,
+          mimeType: file.mimeType || "application/octet-stream",
+          manifestCID: file.manifestCID || file.cid || "",
+          cid: file.cid || "",
           expirationOption,
-          downloadLimitOption: oneTime ? "1" : downloadLimitOption,
-          oneTime,
           passwordProtected,
           password: password.trim(),
         },
-        vaultXId
+        effectiveOwner
       );
 
       setCreatedShare(share);
@@ -111,7 +110,6 @@ export function CreateSecureShareModal({
     setError(null);
     setPasswordProtected(false);
     setPassword("");
-    setOneTime(false);
     onClose();
   };
 
@@ -215,56 +213,9 @@ export function CreateSecureShareModal({
                 </div>
               </div>
 
-              {/* Download Limit Option */}
-              <div className="space-y-1.5">
-                <label className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
-                  <Download className="h-3.5 w-3.5 text-[#2563EB]" />
-                  <span>Download Limit</span>
-                </label>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {(["1", "5", "10", "unlimited"] as const).map((opt) => (
-                    <button
-                      key={opt}
-                      type="button"
-                      disabled={oneTime}
-                      onClick={() => setDownloadLimitOption(opt)}
-                      className={`py-2 text-center rounded-xl text-xs font-semibold transition-all border ${
-                        oneTime
-                          ? "opacity-50 cursor-not-allowed bg-slate-100 border-slate-200 text-slate-400"
-                          : downloadLimitOption === opt
-                          ? "bg-[#2563EB] text-white border-[#2563EB] shadow-xs"
-                          : "bg-white text-slate-700 border-slate-200 hover:border-blue-300 hover:bg-slate-50"
-                      }`}
-                    >
-                      {opt === "unlimited" ? "Unlimited" : `${opt} download${opt === "1" ? "" : "s"}`}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Toggles: Password Protection & One-Time Access */}
+              {/* Password Protection Toggle */}
               <div className="space-y-3 pt-2 border-t border-slate-100">
-                {/* One-Time Access Toggle */}
-                <div className="flex items-center justify-between p-3 rounded-2xl border border-slate-200 bg-white">
-                  <div>
-                    <span className="text-xs font-bold text-slate-900 block">One-time download</span>
-                    <span className="text-[11px] text-slate-500 block">
-                      Share automatically expires immediately after the first successful download
-                    </span>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={oneTime}
-                    onChange={(e) => {
-                      setOneTime(e.target.checked);
-                      if (e.target.checked) setDownloadLimitOption("1");
-                    }}
-                    className="h-4 w-4 rounded text-[#2563EB] focus:ring-[#2563EB] accent-[#2563EB] cursor-pointer"
-                  />
-                </div>
-
-                {/* Password Protection Toggle */}
-                <div className="space-y-2 p-3 rounded-2xl border border-slate-200 bg-white">
+                <div className="space-y-2 p-3.5 rounded-2xl border border-slate-200 bg-white">
                   <div className="flex items-center justify-between">
                     <div>
                       <span className="text-xs font-bold text-slate-900 block">Protect with password</span>
@@ -343,8 +294,8 @@ export function CreateSecureShareModal({
                 </div>
                 <div className="p-3 rounded-xl border border-slate-200 bg-slate-50 text-xs">
                   <span className="text-[10px] text-slate-400 block font-medium">Downloads:</span>
-                  <span className="font-semibold text-slate-800">
-                    0 / {createdShare.maxDownloads !== null ? createdShare.maxDownloads : "∞"}
+                  <span className="font-semibold text-emerald-700">
+                    Unlimited
                   </span>
                 </div>
               </div>

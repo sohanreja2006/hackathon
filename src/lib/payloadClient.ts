@@ -4,12 +4,16 @@ import { PayloadFile, PayloadChunk, PayloadManifest, FileUploadStatus } from "@/
  * Payload CMS Client Library for SecureVault Frontend
  */
 
-function getAuthHeaders(vaultXId?: string | null): Record<string, string> {
+function getAuthHeaders(walletOrVxId?: string | null): Record<string, string> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
-  if (vaultXId) {
-    headers["x-vaultx-id"] = vaultXId;
+  if (walletOrVxId) {
+    if (walletOrVxId.startsWith("VX-")) {
+      headers["x-vaultx-id"] = walletOrVxId;
+    } else {
+      headers["x-wallet-address"] = walletOrVxId;
+    }
   }
   return headers;
 }
@@ -215,9 +219,12 @@ export async function deletePayloadFile(
 
 export interface CreateSecureShareParams {
   fileId: string;
+  fileName?: string;
+  fileSize?: number;
+  mimeType?: string;
+  manifestCID?: string;
+  cid?: string;
   expirationOption?: "never" | "1h" | "24h" | "7d" | "30d";
-  downloadLimitOption?: "1" | "5" | "10" | "unlimited";
-  oneTime?: boolean;
   passwordProtected?: boolean;
   password?: string;
 }

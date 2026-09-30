@@ -47,16 +47,6 @@ export async function GET(req: NextRequest) {
           { status: 410 }
         );
       }
-      if (status === "download-limit-reached") {
-        return NextResponse.json(
-          {
-            success: false,
-            status: "download-limit-reached",
-            error: "Download limit reached. This secure share is no longer available.",
-          },
-          { status: 410 }
-        );
-      }
       return NextResponse.json(
         {
           success: false,
@@ -73,16 +63,12 @@ export async function GET(req: NextRequest) {
       fileName: share.fileName,
       fileSize: share.fileSize,
       mimeType: share.mimeType,
+      manifestCID: share.manifestCID,
       encryptionAlgorithm: share.encryptionAlgorithm,
       integrityAlgorithm: share.integrityAlgorithm,
       expiresAt: share.expiresAt,
-      maxDownloads: share.maxDownloads,
       downloadCount: share.downloadCount,
-      downloadsRemaining:
-        share.maxDownloads !== null
-          ? Math.max(0, share.maxDownloads - share.downloadCount)
-          : "Unlimited",
-      oneTime: share.oneTime,
+      downloadsRemaining: "Unlimited",
       passwordProtected: share.passwordProtected,
       status: share.status,
     };
