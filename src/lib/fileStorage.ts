@@ -159,6 +159,36 @@ export function deleteUserFile(walletAddress: string, fileId: string): void {
 }
 
 /**
+ * Delete a file record across all local storage registry prefixes
+ */
+export function deleteVaultFile(fileIdOrCid: string): void {
+  if (typeof window === "undefined" || !fileIdOrCid) return;
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(STORAGE_KEY_PREFIX)) {
+        try {
+          const raw = localStorage.getItem(key);
+          if (raw) {
+            const parsed = JSON.parse(raw) as StoredEncryptedFile[];
+            if (Array.isArray(parsed)) {
+              const updated = parsed.filter(
+                (f) => f.id !== fileIdOrCid && f.cid !== fileIdOrCid
+              );
+              localStorage.setItem(key, JSON.stringify(updated));
+            }
+          }
+        } catch {
+          // ignore parse error
+        }
+      }
+    }
+  } catch (err) {
+    console.error("Failed to delete vault file across stores", err);
+  }
+}
+
+/**
  * Get all files that have been shared with a specific wallet address
  */
 export function getSharedWithMeFiles(walletAddress?: string | null): SharedFileRecord[] {

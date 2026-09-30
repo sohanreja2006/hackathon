@@ -18,6 +18,7 @@ import {
   FileCode,
   FileText,
   AlertCircle,
+  Trash2,
 } from "lucide-react";
 import { formatBytes, downloadAndDecryptFromIpfs } from "@/lib/crypto";
 import { PayloadFile, PayloadChunk } from "@/payload/types";
@@ -31,6 +32,7 @@ interface FileDetailsModalProps {
   initialFile?: PayloadFile | null;
   localKeyHex?: string | null;
   vaultXId?: string | null;
+  onDelete?: () => void;
 }
 
 export function FileDetailsModal({
@@ -40,6 +42,7 @@ export function FileDetailsModal({
   initialFile,
   localKeyHex,
   vaultXId,
+  onDelete,
 }: FileDetailsModalProps) {
   const [file, setFile] = useState<PayloadFile | null>(initialFile || null);
   const [chunks, setChunks] = useState<PayloadChunk[]>([]);
@@ -402,12 +405,24 @@ export function FileDetailsModal({
         {/* Footer */}
         <div className="border-t border-slate-100 p-4 bg-slate-50/50 flex items-center justify-between text-xs text-slate-500">
           <span>Owner: {file?.ownerWallet ? `${file.ownerWallet.substring(0, 6)}...${file.ownerWallet.slice(-4)}` : "—"}</span>
-          <button
-            onClick={onClose}
-            className="px-4 py-1.5 rounded-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 font-medium"
-          >
-            Close
-          </button>
+          <div className="flex items-center gap-2">
+            {onDelete && (
+              <button
+                type="button"
+                onClick={onDelete}
+                className="px-3.5 py-1.5 rounded-full border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 font-semibold transition-colors flex items-center gap-1.5"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>Delete File</span>
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="px-4 py-1.5 rounded-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 font-medium"
+            >
+              Close
+            </button>
+          </div>
         </div>
       </div>
     </div>

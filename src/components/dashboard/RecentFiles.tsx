@@ -20,17 +20,18 @@ import {
   ArrowRight, 
   Eye, 
   EyeOff,
-  Plus
+  Plus,
+  Trash2
 } from "lucide-react";
 import Link from "next/link";
 import { formatBytes, downloadAndDecryptFromIpfs, reencryptKeyForRecipient, decryptKeyForRecipient } from "@/lib/crypto";
-import { getAllVaultFiles, getSharedWithMeFiles, recordFileShare, StoredEncryptedFile, SharedFileRecord } from "@/lib/fileStorage";
+import { getAllVaultFiles, getSharedWithMeFiles, recordFileShare, deleteVaultFile, StoredEncryptedFile, SharedFileRecord } from "@/lib/fileStorage";
 import { useAccount, useSignMessage } from "wagmi";
 import { isAddress } from "viem";
 import { getIpfsUrl } from "@/lib/ipfs/gateway";
 import { useVaultXWallet } from "@/context/VaultXWalletContext";
 import { OwlCompanion } from "@/components/ui/OwlCompanion";
-import { fetchPayloadFiles } from "@/lib/payloadClient";
+import { fetchPayloadFiles, deletePayloadFile } from "@/lib/payloadClient";
 import { FileDetailsModal } from "./FileDetailsModal";
 
 export function RecentFiles() {
@@ -73,6 +74,32 @@ export function RecentFiles() {
 
   // File Details Modal State (Drive-style file details & chunk map)
   const [detailsModalFile, setDetailsModalFile] = useState<StoredEncryptedFile | null>(null);
+
+  // Delete Confirmation Modal State
+  const [fileToDelete, setFileToDelete] = useState<StoredEncryptedFile | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleConfirmDelete = async () => {
+    if (!fileToDelete) return;
+    try {
+      setIsDeleting(true);
+      if (fileToDelete.id) {
+        await deletePayloadFile(fileToDelete.id, vaultXIdentity?.id);
+      }
+      deleteVaultFile(fileToDelete.id);
+      if (fileToDelete.cid) {
+        deleteVaultFile(fileToDelete.cid);
+      }
+      setActiveNotification(`File "${fileToDelete.fileName}" removed from vault.`);
+      setFileToDelete(null);
+      await refreshFiles();
+    } catch (err) {
+      console.error("Delete failed:", err);
+      setActiveNotification("Failed to delete file.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   // Load all user files from registry & Payload CMS backend
   const refreshFiles = useCallback(async () => {
@@ -631,6 +658,16 @@ export function RecentFiles() {
                           <KeyRound className="h-3.5 w-3.5" />
                         )}
                       </button>
+
+                      {/* Delete File Button */}
+                      <button
+                        onClick={() => setFileToDelete(file)}
+                        type="button"
+                        title="Delete file from vault"
+                        className="p-1.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:text-rose-600 hover:border-rose-300 hover:bg-rose-50/50 transition-colors"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -1051,7 +1088,90 @@ export function RecentFiles() {
         fileId={detailsModalFile?.id || null}
         localKeyHex={detailsModalFile?.keyHex || null}
         vaultXId={vaultXIdentity?.id}
+        onDelete={
+          detailsModalFile
+            ? () => {
+                const target = detailsModalFile;
+                setDetailsModalFile(null);
+                setFileToDelete(target);
+              }
+            : undefined
+        }
       />
+
+      {/* Delete Confirmation Modal */}
+      {fileToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+          <div className="responsive-modal w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <div className="flex items-center gap-2.5 text-slate-900 font-semibold text-sm">
+                <div className="h-8 w-8 rounded-lg bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600">
+                  <Trash2 className="h-4 w-4" />
+                </div>
+                <div>
+                  <span className="font-bold text-slate-900">Delete File from Vault</span>
+                  <p className="text-[11px] text-slate-500 font-normal">Remove encrypted payload and metadata</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFileToDelete(null)}
+                disabled={isDeleting}
+                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 transition-colors disabled:opacity-50"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-2 bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs">
+              <div className="text-slate-500 font-mono truncate">
+                File: <span className="text-slate-900 font-semibold font-sans">{fileToDelete.fileName}</span>
+              </div>
+              {fileToDelete.cid && (
+                <div className="text-slate-500 font-mono truncate text-[11px]">
+                  CID: <span className="text-[#2563EB]">{fileToDelete.cid}</span>
+                </div>
+              )}
+              <div className="text-slate-500 font-mono text-[11px]">
+                Size: <span className="text-slate-700 font-medium">{formatBytes(fileToDelete.fileSize)}</span>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600">
+              Are you sure you want to remove this file from your vault? This will permanently delete the file metadata, chunks, and local references.
+            </p>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
+              <button
+                type="button"
+                onClick={() => setFileToDelete(null)}
+                disabled={isDeleting}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 rounded-xl hover:bg-slate-100 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                className="flex items-center gap-2 px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white text-xs font-bold shadow-xs transition-all disabled:opacity-50"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>Delete File</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

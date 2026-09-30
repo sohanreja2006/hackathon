@@ -190,3 +190,21 @@ export async function fetchPayloadManifest(
     return null;
   }
 }
+
+export async function deletePayloadFile(
+  fileId: string,
+  vaultXId?: string | null
+): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/payload/files/${encodeURIComponent(fileId)}`, {
+      method: "DELETE",
+      headers: getAuthHeaders(vaultXId),
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    return Boolean(data.success);
+  } catch (err) {
+    console.error("deletePayloadFile error:", err);
+    return false;
+  }
+}
