@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import {
   Shield,
@@ -17,6 +16,7 @@ import { useAuthStatus } from "@/hooks/useAuthStatus";
 import { useVaultXWallet } from "@/context/VaultXWalletContext";
 import { WalletConnectButton } from "@/components/wallet/WalletConnectButton";
 import { formatAddress } from "@/lib/utils";
+import { OwlCompanion } from "@/components/ui/OwlCompanion";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -60,13 +60,8 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   if (!isMounted || isConnecting || isCheckingSession) {
     return (
       <div className="flex min-h-[70vh] flex-col items-center justify-center p-6 text-center bg-[#F8FAFC]">
-        <div className="relative mb-4 h-16 w-16">
-          <Image
-            src="/images/owl-verify.png"
-            alt="SecureVault Owl"
-            fill
-            className="object-contain animate-pulse rounded-2xl"
-          />
+        <div className="relative mb-4 flex items-center justify-center">
+          <OwlCompanion state="connecting" size="sm" trackMouse />
         </div>
         <div className="font-semibold text-sm text-slate-800">
           Checking secure session...
@@ -83,13 +78,8 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   if (!anyConnected) {
     return (
       <div className="mx-auto flex min-h-[75vh] max-w-md flex-col items-center justify-center px-4 py-16 text-center animate-in fade-in duration-300">
-        <div className="relative mb-5 h-24 w-24">
-          <Image
-            src="/images/owl-verify.png"
-            alt="SecureVault Owl"
-            fill
-            className="object-contain drop-shadow-md rounded-2xl"
-          />
+        <div className="relative mb-5 flex items-center justify-center">
+          <OwlCompanion state="connecting" size="md" trackMouse />
         </div>
 
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">
@@ -123,13 +113,8 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     return (
       <div className="mx-auto flex min-h-[80vh] max-w-md flex-col items-center justify-center px-4 py-12 text-center animate-in fade-in duration-300">
         {/* Owl Mascot looking down */}
-        <div className="relative mb-4 h-24 w-24">
-          <Image
-            src="/images/owl-verify.png"
-            alt="SecureVault Owl Guardian"
-            fill
-            className="object-contain drop-shadow-md rounded-2xl"
-          />
+        <div className="relative mb-4 flex items-center justify-center">
+          <OwlCompanion state="verifying" size="md" trackMouse />
         </div>
 
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">

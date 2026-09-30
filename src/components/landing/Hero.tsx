@@ -2,7 +2,6 @@
 
 import React from "react";
 import Link from "next/link";
-import Image from "next/image";
 import {
   ShieldCheck,
   Lock,
@@ -15,6 +14,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { useAccount } from "wagmi";
+import { SecureVaultOwl } from "@/components/ui/OwlCompanion";
 
 export function Hero() {
   const { isConnected } = useAccount();
@@ -81,19 +81,17 @@ export function Hero() {
             </div>
           </div>
 
-          {/* Right Column: 3D Cyber Owl Guardian */}
-          <div className="lg:col-span-5 flex justify-center relative">
-            <div className="relative w-full max-w-[420px] aspect-square">
-              {/* Soft decorative glow circle behind owl */}
-              <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-blue-200/50 via-cyan-100/40 to-transparent blur-2xl transform scale-90" />
-              
-              <Image
-                src="/images/owl-hero.png"
-                alt="SecureVault Owl Guardian"
-                fill
-                priority
-                sizes="(max-width: 768px) 100vw, 420px"
-                className="object-contain relative z-10 drop-shadow-xl hover:scale-[1.02] transition-transform duration-300"
+          {/* Right Column: Animated SVG Owl Guardian */}
+          <div className="lg:col-span-5 flex justify-center items-center relative">
+            <div className="relative flex items-center justify-center">
+              {/* Soft decorative glow ring */}
+              <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-blue-200/50 via-cyan-100/40 to-transparent blur-3xl transform scale-110" />
+              <SecureVaultOwl
+                state="idle"
+                size="hero"
+                trackMouse
+                showSpeechBubble
+                speechText="Your files stay encrypted on your device."
               />
             </div>
           </div>

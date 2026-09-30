@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from "react";
-import Image from "next/image";
 import {
   X,
   Lock,
@@ -13,6 +12,7 @@ import {
 import { useAuthStatus } from "@/hooks/useAuthStatus";
 import { useVaultXWallet } from "@/context/VaultXWalletContext";
 import { formatAddress, cn } from "@/lib/utils";
+import { OwlCompanion } from "@/components/ui/OwlCompanion";
 
 interface ConnectWalletModalProps {
   isOpen: boolean;
@@ -80,14 +80,9 @@ export function ConnectWalletModal({
         {/* ── Screen 2: Connect to SecureVault ── */}
         {activeView === "choose" && (
           <div className="p-8 text-center">
-            {/* Friendly Owl Mascot Header */}
-            <div className="relative mx-auto mb-4 h-24 w-24">
-              <Image
-                src="/images/owl-verify.png"
-                alt="SecureVault Owl"
-                fill
-                className="object-contain drop-shadow-md rounded-2xl"
-              />
+            {/* Friendly Living Owl Mascot Header */}
+            <div className="relative mx-auto mb-3 flex items-center justify-center">
+              <OwlCompanion state="connecting" size="md" trackMouse />
             </div>
 
             <h2 className="text-2xl font-bold tracking-tight text-slate-900">

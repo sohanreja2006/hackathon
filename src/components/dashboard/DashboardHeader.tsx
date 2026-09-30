@@ -1,10 +1,9 @@
 "use client";
 
 import React from "react";
-import Image from "next/image";
-import Link from "next/image";
 import { useAuthStatus } from "@/hooks/useAuthStatus";
 import { useVaultXWallet } from "@/context/VaultXWalletContext";
+import { OwlCompanion } from "@/components/ui/OwlCompanion";
 
 export function DashboardHeader() {
   const { address } = useAuthStatus();
@@ -22,16 +21,22 @@ export function DashboardHeader() {
           <p className="text-sm sm:text-base text-slate-500 max-w-lg leading-relaxed">
             Start securing your files with end-to-end privacy. Encrypted locally with AES-256-GCM before uploading to IPFS.
           </p>
+          {activeAddress && (
+            <p className="text-xs text-slate-400 font-mono">
+              {activeAddress.substring(0, 6)}...{activeAddress.slice(-4)}
+            </p>
+          )}
         </div>
 
-        {/* Owl Mascot with Shield */}
-        <div className="relative h-28 w-28 sm:h-36 sm:w-36 shrink-0">
-          <Image
-            src="/images/owl-success.png"
-            alt="SecureVault Guardian"
-            fill
-            priority
-            className="object-contain drop-shadow-md hover:scale-105 transition-transform duration-200"
+        {/* Animated Owl Guardian */}
+        <div className="shrink-0 flex items-center justify-center relative">
+          <div className="absolute inset-0 rounded-full bg-emerald-100/50 blur-2xl scale-90 pointer-events-none" />
+          <OwlCompanion
+            state="success"
+            size="lg"
+            showSpeechBubble
+            speechText="Your vault is secure."
+            trackMouse
           />
         </div>
       </div>
