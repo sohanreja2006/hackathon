@@ -1,24 +1,24 @@
 "use client";
 
 import React, { useState } from "react";
-import { Copy, Check, LogOut, ShieldCheck, Lock, UploadCloud, DownloadCloud, Key, ExternalLink } from "lucide-react";
+import { Copy, Check, LogOut, ShieldCheck, Lock, UploadCloud, Key } from "lucide-react";
 import Link from "next/link";
 import { useAuthStatus } from "@/hooks/useAuthStatus";
 import { useVaultXWallet } from "@/context/VaultXWalletContext";
-import { useGoogleAuth } from "@/hooks/useGoogleAuth";
 import { formatAddress } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 export function DashboardHeader() {
   const { address, chainName, disconnect, logout } = useAuthStatus();
-  const { identity, isConnected: isVaultXConnected, openModal: openVaultXModal } = useVaultXWallet();
-  const { googleUser, isGoogleAuthenticated, googleSignOut } = useGoogleAuth();
+  const { isConnected: isVaultXConnected, identity, openModal: openVaultXModal } = useVaultXWallet();
   const [copied, setCopied] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
+  const activeWalletAddress = address || identity?.id;
+
   const handleCopy = () => {
-    if (!address) return;
-    navigator.clipboard.writeText(address);
+    if (!activeWalletAddress) return;
+    navigator.clipboard.writeText(activeWalletAddress);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -26,9 +26,6 @@ export function DashboardHeader() {
   const handleLogout = async () => {
     setIsLoggingOut(true);
     try {
-      if (isGoogleAuthenticated) {
-        await googleSignOut("/");
-      }
       await logout();
       disconnect();
     } finally {
@@ -51,15 +48,15 @@ export function DashboardHeader() {
           <div>
             <div className="flex items-center gap-2">
               <span className="font-bold text-[#f2f4f6] text-sm">
-                {googleUser?.name ? `${googleUser.name}'s Vault` : "MetaMask Portfolio Vault"}
+                MetaMask Portfolio Vault
               </span>
               <span className="rounded-full bg-[#f6851b]/15 border border-[#f6851b]/30 px-2 py-0.5 text-[9px] font-mono text-[#f6851b] font-semibold">
                 ACTIVE
               </span>
             </div>
-            {address && (
+            {activeWalletAddress && (
               <div className="flex items-center gap-1.5 text-xs text-[#848c96] font-mono mt-0.5">
-                <span>{formatAddress(address, 6)}</span>
+                <span>{formatAddress(activeWalletAddress, 6)}</span>
                 <button
                   onClick={handleCopy}
                   type="button"
@@ -82,12 +79,6 @@ export function DashboardHeader() {
             </span>
             <span>{chainName || "Ethereum / Sepolia"}</span>
           </div>
-
-          {isGoogleAuthenticated && (
-            <div className="inline-flex items-center gap-1.5 rounded-full border border-blue-500/30 bg-blue-950/40 px-3 py-1 text-xs font-mono text-blue-300">
-              <span>Google Verified</span>
-            </div>
-          )}
 
           <div className="inline-flex items-center gap-1.5 rounded-full border border-[#f6851b]/30 bg-[#f6851b]/10 px-3 py-1 text-xs font-mono text-[#f6851b]">
             <ShieldCheck className="h-3.5 w-3.5" />
@@ -144,59 +135,28 @@ export function DashboardHeader() {
           </div>
         </div>
 
-        {/* Right: Dual Identity Card Panel */}
+        {/* Right: Sovereign Identity Card Panel */}
         <div className="identity-card flex flex-col gap-2.5 bg-[#141618] border border-[#2e3238] p-4 rounded-2xl font-mono text-xs w-full lg:w-auto min-w-[280px] shadow-lg">
           <div className="flex items-center justify-between gap-4 border-b border-[#2e3238] pb-2">
             <span className="text-[10px] uppercase text-[#848c96] font-semibold tracking-wider">
-              Connected Dual Identity
+              Sovereign Identity
             </span>
             <span className="text-[10px] text-emerald-400 font-sans">Active Session</span>
           </div>
 
           <div className="grid grid-cols-1 gap-2">
-            {/* Google Identity */}
-            {isGoogleAuthenticated && googleUser && (
-              <div className="flex items-center gap-2.5 bg-[#1e2024] p-2.5 rounded-xl border border-blue-900/30">
-                {googleUser.image ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={googleUser.image}
-                    alt={googleUser.name ?? "Google"}
-                    className="h-8 w-8 rounded-full border border-[#3b4046] shrink-0"
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-violet-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
-                    {googleUser.name?.[0] ?? "G"}
-                  </div>
-                )}
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between text-[10px] text-[#848c96]">
-                    <span>Google Account</span>
-                    <span className="text-emerald-400 font-sans">● Verified</span>
-                  </div>
-                  <span className="font-semibold text-[#f2f4f6] truncate text-[11px] block mt-0.5">
-                    {googleUser.name ?? googleUser.email}
-                  </span>
-                  {googleUser.email && (
-                    <p className="text-[10px] text-[#848c96] truncate">{googleUser.email}</p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* MetaMask Identity */}
-            {address && (
+            {/* MetaMask / Web3 Identity */}
+            {activeWalletAddress ? (
               <div className="flex items-center gap-2.5 bg-[#1e2024] p-2.5 rounded-xl border border-[#f6851b]/30">
                 <span className="text-xl">🦊</span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between text-[10px] text-[#848c96]">
-                    <span>MetaMask Web3</span>
-                    <span className="text-emerald-400 font-sans">● Connected</span>
+                    <span>{isVaultXConnected ? "VaultX Key Vault" : "MetaMask Web3"}</span>
+                    <span className="text-emerald-400 font-sans">● Verified</span>
                   </div>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <span className="font-semibold text-[#f6851b] truncate font-mono text-[11px]">
-                      {formatAddress(address, 6)}
+                      {formatAddress(activeWalletAddress, 6)}
                     </span>
                     <button
                       onClick={handleCopy}
@@ -208,6 +168,10 @@ export function DashboardHeader() {
                     </button>
                   </div>
                 </div>
+              </div>
+            ) : (
+              <div className="text-[#848c96] text-xs py-2">
+                No active wallet session
               </div>
             )}
           </div>

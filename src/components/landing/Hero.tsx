@@ -50,7 +50,7 @@ export function Hero() {
 
             {/* Supporting Text */}
             <p className="max-w-2xl text-base sm:text-lg text-[#848C96] leading-relaxed mx-auto lg:mx-0">
-              VaultX is a decentralized sovereign file vault secured by MetaMask and dual-layer Google OAuth.
+              VaultX is a decentralized sovereign file vault powered by MetaMask Web3 authentication.
               Client-side AES-256-GCM encryption guarantees zero server custody — your plaintext never leaves your device.
             </p>
 
