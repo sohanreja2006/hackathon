@@ -27,9 +27,9 @@ export function DashboardHeader() {
     try {
       if (isGoogleAuthenticated) {
         await googleSignOut("/");
-      } else {
-        await logout();
       }
+      await logout();
+      disconnect();
     } finally {
       setIsLoggingOut(false);
     }
@@ -44,17 +44,25 @@ export function DashboardHeader() {
         {/* Left: Title and Verified Session Details */}
         <div className="space-y-3">
           <div className="security-pills flex items-center gap-2 flex-wrap">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-950/40 px-2.5 py-0.5 text-xs font-mono text-emerald-300">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            {isGoogleAuthenticated && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-500/30 bg-blue-950/40 px-2.5 py-0.5 text-xs font-mono text-blue-300">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                </span>
+                <span>Google Authenticated</span>
               </span>
-              <span>
-                {isGoogleAuthenticated && !address
-                  ? "Google OAuth 2.0 Verified"
-                  : "Cryptographically Verified (SIWE / EIP-4361)"}
+            )}
+
+            {address && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-950/40 px-2.5 py-0.5 text-xs font-mono text-emerald-300">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span>MetaMask Verified (SIWE / EIP-4361)</span>
               </span>
-            </span>
+            )}
 
             <span className="inline-flex items-center gap-1 rounded-full border border-cyan-500/30 bg-cyan-950/40 px-2.5 py-0.5 text-xs font-mono text-cyan-300">
               <ShieldCheck className="h-3 w-3 text-cyan-400" />
@@ -68,7 +76,7 @@ export function DashboardHeader() {
 
           <p className="text-sm text-zinc-400 max-w-xl">
             Decentralized sovereign vault for your confidential files.
-            Authenticated via non-custodial cryptographic signature.
+            Authenticated via Google Identity + Non-custodial MetaMask Cryptographic Signature.
           </p>
         </div>
 
@@ -76,15 +84,15 @@ export function DashboardHeader() {
         <div className="identity-card flex flex-col gap-2.5 bg-zinc-950/80 border border-zinc-800 p-4 rounded-xl font-mono text-xs w-full lg:w-auto">
           <div className="flex items-center justify-between gap-4 border-b border-zinc-800/80 pb-2">
             <span className="text-[10px] uppercase text-zinc-500 font-semibold tracking-wider">
-              Connected Identity
+              Connected Dual Identity
             </span>
             <span className="text-[10px] text-emerald-400 font-sans">Active Session</span>
           </div>
 
-          <div className="grid grid-cols-1 gap-3">
+          <div className="grid grid-cols-1 gap-2.5">
             {/* Google User Identity */}
-            {isGoogleAuthenticated && googleUser ? (
-              <div className="flex items-center gap-2.5 bg-zinc-900/60 p-2.5 rounded-lg border border-violet-900/30 min-w-[240px]">
+            {isGoogleAuthenticated && googleUser && (
+              <div className="flex items-center gap-2.5 bg-zinc-900/60 p-2.5 rounded-lg border border-blue-900/30 min-w-[240px]">
                 {googleUser.image ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -101,7 +109,7 @@ export function DashboardHeader() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between text-[10px] text-zinc-400">
                     <span>Google Account</span>
-                    <span className="text-emerald-400">● Connected</span>
+                    <span className="text-emerald-400 font-sans">● Verified</span>
                   </div>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <span className="font-semibold text-zinc-200 truncate text-[11px]">
@@ -113,14 +121,16 @@ export function DashboardHeader() {
                   )}
                 </div>
               </div>
-            ) : address ? (
-              /* MetaMask Identity */
-              <div className="flex items-center gap-2.5 bg-zinc-900/60 p-2.5 rounded-lg border border-zinc-800 min-w-[240px]">
+            )}
+
+            {/* MetaMask Identity */}
+            {address && (
+              <div className="flex items-center gap-2.5 bg-zinc-900/60 p-2.5 rounded-lg border border-amber-900/30 min-w-[240px]">
                 <span className="text-xl">🦊</span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between text-[10px] text-zinc-400">
                     <span>MetaMask Web3 Wallet</span>
-                    <span className="text-emerald-400">● Connected</span>
+                    <span className="text-emerald-400 font-sans">● Connected</span>
                   </div>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <span className="font-semibold text-zinc-200 truncate">
@@ -141,23 +151,25 @@ export function DashboardHeader() {
                   </div>
                 </div>
               </div>
-            ) : isVaultXConnected && identity ? (
-              /* 3. VaultX Secure Wallet Identity (Only when MetaMask is not connected) */
-              <div className="flex items-center gap-2.5 bg-zinc-900/60 p-2.5 rounded-lg border border-violet-900/30 min-w-[240px]">
+            )}
+
+            {/* VaultX Secure Wallet Identity (if active) */}
+            {isVaultXConnected && identity && (
+              <div className="flex items-center gap-2.5 bg-zinc-900/60 p-2.5 rounded-lg border border-cyan-900/30 min-w-[240px]">
                 <span className="text-xl">🔐</span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between text-[10px] text-zinc-400">
                     <span>VaultX Secure Wallet</span>
-                    <span className="text-violet-400">● Protected</span>
+                    <span className="text-cyan-400 font-sans">● Protected</span>
                   </div>
                   <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="font-semibold text-violet-300 truncate">
+                    <span className="font-semibold text-cyan-300 truncate">
                       {identity.id}
                     </span>
                   </div>
                 </div>
               </div>
-            ) : null}
+            )}
           </div>
 
           {/* Action Row */}
