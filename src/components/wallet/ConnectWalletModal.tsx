@@ -156,21 +156,41 @@ export function ConnectWalletModal({
                   <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 border border-blue-100 text-blue-600 shrink-0">
                     <Lock className="h-5 w-5" />
                   </div>
-                  <div>
+                  <div className="text-left">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-sm text-slate-900">Secure Key Wallet</span>
-                      {isVaultXConnected && (
-                        <span className="rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-[10px] font-semibold">
-                          Active
-                        </span>
-                      )}
                     </div>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      In-browser AES-256 local key engine
+                      {isVaultXConnected
+                        ? "Unlocked in active tab session"
+                        : hasExistingWallet
+                        ? "Saved key vault · Click to connect"
+                        : "In-browser AES-256 local key engine"}
                     </p>
                   </div>
                 </div>
-                <ChevronRight className="h-5 w-5 text-slate-400 group-hover:text-[#2563EB] group-hover:translate-x-0.5 transition-all" />
+                {isVaultXConnected ? (
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full bg-emerald-100 text-emerald-800 px-2.5 py-1 text-xs font-semibold">
+                      Connected
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        disconnectWallet();
+                      }}
+                      className="text-xs text-rose-600 hover:text-rose-700 font-semibold px-2.5 py-1 rounded-lg hover:bg-rose-50 border border-rose-200 transition-colors"
+                    >
+                      Disconnect
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 text-xs font-medium text-[#2563EB]">
+                    <span>{hasExistingWallet ? "Unlock" : "Create"}</span>
+                    <ChevronRight className="h-4 w-4 text-slate-400 group-hover:text-[#2563EB] group-hover:translate-x-0.5 transition-all" />
+                  </div>
+                )}
               </button>
             </div>
 

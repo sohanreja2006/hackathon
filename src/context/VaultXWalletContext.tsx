@@ -33,15 +33,27 @@ export function VaultXWalletProvider({ children }: { children: React.ReactNode }
   const [isCreating, setIsCreating] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Synchronize on mount
+  // Synchronize on mount - never auto-connect without user initiation
   useEffect(() => {
     async function loadIdentity() {
       const exists = await hasVaultXWallet();
       setHasExistingWallet(exists);
-      if (exists) {
+
+      // Only stay connected if user explicitly connected in this tab session
+      const isSessionActive =
+        typeof window !== "undefined" &&
+        sessionStorage.getItem("vaultx_session_connected") === "true";
+
+      if (exists && isSessionActive) {
         const stored = getVaultXWalletIdentity();
-        setIdentity(stored);
+        if (stored && stored.status === "protected") {
+          setIdentity(stored);
+          return;
+        }
       }
+
+      // Default: starts disconnected, displaying "Connect Wallet"
+      setIdentity(null);
     }
     loadIdentity();
   }, []);
@@ -55,6 +67,9 @@ export function VaultXWalletProvider({ children }: { children: React.ReactNode }
       const newIdentity = await createVaultXWallet();
       setIdentity(newIdentity);
       setHasExistingWallet(true);
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("vaultx_session_connected", "true");
+      }
       return newIdentity;
     } finally {
       setIsCreating(false);
@@ -66,6 +81,9 @@ export function VaultXWalletProvider({ children }: { children: React.ReactNode }
     try {
       const unlocked = await unlockVaultXWallet();
       setIdentity(unlocked);
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("vaultx_session_connected", "true");
+      }
       return unlocked;
     } finally {
       setIsCreating(false);
@@ -74,12 +92,17 @@ export function VaultXWalletProvider({ children }: { children: React.ReactNode }
 
   const disconnectWallet = useCallback(() => {
     lockVaultXWallet();
-    const updated = getVaultXWalletIdentity();
-    setIdentity(updated);
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("vaultx_session_connected");
+    }
+    setIdentity(null);
   }, []);
 
   const destroyWallet = useCallback(async () => {
     await destroyVaultXWallet();
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("vaultx_session_connected");
+    }
     setIdentity(null);
     setHasExistingWallet(false);
   }, []);

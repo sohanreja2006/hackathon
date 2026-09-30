@@ -16,7 +16,7 @@ export function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const activeAddress = address || identity?.id;
+  const activeAddress = address || (isVxConnected ? identity?.id : undefined);
 
   const handleCopy = () => {
     if (!activeAddress) return;
