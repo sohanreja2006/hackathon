@@ -208,3 +208,103 @@ export async function deletePayloadFile(
     return false;
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SECURE SHARE CLIENT API
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface CreateSecureShareParams {
+  fileId: string;
+  expirationOption?: "never" | "1h" | "24h" | "7d" | "30d";
+  downloadLimitOption?: "1" | "5" | "10" | "unlimited";
+  oneTime?: boolean;
+  passwordProtected?: boolean;
+  password?: string;
+}
+
+export async function createSecureShare(
+  params: CreateSecureShareParams,
+  vaultXId?: string | null
+) {
+  try {
+    const res = await fetch("/api/payload/shares", {
+      method: "POST",
+      headers: getAuthHeaders(vaultXId),
+      body: JSON.stringify(params),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || "Failed to create secure share.");
+    }
+    return data.share;
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Failed to create secure share.";
+    throw new Error(msg);
+  }
+}
+
+export async function fetchFileShares(
+  fileId: string,
+  vaultXId?: string | null
+) {
+  try {
+    const res = await fetch(`/api/payload/shares?fileId=${encodeURIComponent(fileId)}`, {
+      method: "GET",
+      headers: getAuthHeaders(vaultXId),
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.success && Array.isArray(data.shares) ? data.shares : [];
+  } catch (err) {
+    console.error("fetchFileShares error:", err);
+    return [];
+  }
+}
+
+export async function lookupSecureShare(shareCode: string) {
+  try {
+    const res = await fetch(`/api/payload/shares/lookup?code=${encodeURIComponent(shareCode)}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    });
+    const data = await res.json();
+    return data;
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Lookup failed.";
+    return { success: false, error: msg, status: "error" };
+  }
+}
+
+export async function accessSecureShare(shareCode: string, password?: string) {
+  try {
+    const res = await fetch("/api/payload/shares/access", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: shareCode, password }),
+    });
+    const data = await res.json();
+    return data;
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Access failed.";
+    return { success: false, error: msg };
+  }
+}
+
+export async function revokeSecureShare(
+  shareId: string,
+  vaultXId?: string | null
+): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/payload/shares/${encodeURIComponent(shareId)}/revoke`, {
+      method: "PATCH",
+      headers: getAuthHeaders(vaultXId),
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    return Boolean(data.success);
+  } catch (err) {
+    console.error("revokeSecureShare error:", err);
+    return false;
+  }
+}
+

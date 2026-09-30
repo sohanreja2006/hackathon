@@ -29,7 +29,7 @@ export function Navbar() {
     { label: "Features", href: "/#features" },
     { label: "How It Works", href: "/#how-it-works" },
     { label: "Security", href: "/#security" },
-    { label: "FAQ", href: "/#faq" },
+    { label: "Receive", href: "/receive" },
     { label: "Vault", href: "/dashboard" },
   ];
 

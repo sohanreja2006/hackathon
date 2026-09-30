@@ -84,3 +84,30 @@ export interface PayloadManifest {
   chunks: ManifestChunkItem[];
   createdAt: string;
 }
+
+export type ShareStatus = "active" | "expired" | "revoked" | "download-limit-reached";
+export type ShareExpirationOption = "never" | "1h" | "24h" | "7d" | "30d";
+export type ShareDownloadLimitOption = "1" | "5" | "10" | "unlimited";
+
+export interface PayloadShare {
+  id: string;
+  shareCode: string; // e.g. SV-9X4K-7P2M-Q81D
+  fileId: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  ownerWallet: string;
+  manifestCID: string;
+  encryptionAlgorithm: "AES-256-GCM";
+  integrityAlgorithm: "SHA-256";
+  expiresAt: string | null; // ISO date string or null for never
+  maxDownloads: number | null; // null for unlimited
+  downloadCount: number;
+  oneTime: boolean;
+  passwordProtected: boolean;
+  passwordHash?: string; // SHA-256 hash
+  status: ShareStatus;
+  createdAt: string;
+  lastAccessedAt?: string;
+}
+

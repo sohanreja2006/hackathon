@@ -21,7 +21,8 @@ import {
   Eye, 
   EyeOff,
   Plus,
-  Trash2
+  Trash2,
+  FileDown,
 } from "lucide-react";
 import Link from "next/link";
 import { formatBytes, downloadAndDecryptFromIpfs, reencryptKeyForRecipient, decryptKeyForRecipient } from "@/lib/crypto";
@@ -33,6 +34,9 @@ import { useVaultXWallet } from "@/context/VaultXWalletContext";
 import { OwlCompanion } from "@/components/ui/OwlCompanion";
 import { fetchPayloadFiles, deletePayloadFile } from "@/lib/payloadClient";
 import { FileDetailsModal } from "./FileDetailsModal";
+import { CreateSecureShareModal } from "./CreateSecureShareModal";
+import { ReceiveSecureFileModal } from "./ReceiveSecureFileModal";
+
 
 export function RecentFiles() {
   const { address } = useAccount();
@@ -74,6 +78,10 @@ export function RecentFiles() {
 
   // File Details Modal State (Drive-style file details & chunk map)
   const [detailsModalFile, setDetailsModalFile] = useState<StoredEncryptedFile | null>(null);
+
+  // Secure Share Code State
+  const [secureShareFile, setSecureShareFile] = useState<StoredEncryptedFile | null>(null);
+  const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false);
 
   // Delete Confirmation Modal State
   const [fileToDelete, setFileToDelete] = useState<StoredEncryptedFile | null>(null);
@@ -428,8 +436,8 @@ export function RecentFiles() {
           </p>
         </div>
 
-        {/* Search Filter & Upload Action */}
-        <div className="flex items-center gap-3">
+        {/* Search Filter & Actions */}
+        <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
           <div className="files-search-wrap relative max-w-xs w-full">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
             <input
@@ -440,6 +448,16 @@ export function RecentFiles() {
               className="w-full rounded-xl border border-slate-200 bg-slate-50/60 py-1.5 pl-8 pr-3 text-xs text-slate-900 placeholder:text-slate-400 focus:border-[#2563EB] focus:bg-white focus:outline-none transition-colors"
             />
           </div>
+
+          <button
+            type="button"
+            onClick={() => setIsReceiveModalOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs transition-colors shrink-0"
+          >
+            <FileDown className="h-3.5 w-3.5 text-[#2563EB]" />
+            <span>Receive File</span>
+          </button>
+
           <Link
             href="/dashboard/vault"
             className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs font-bold shadow-xs transition-colors shrink-0"
@@ -635,12 +653,12 @@ export function RecentFiles() {
                         <span>Decrypt</span>
                       </button>
 
-                      {/* FR-6: Share with Peer Button */}
+                      {/* Share Securely (Share Code) Button */}
                       <button
-                        onClick={() => handleInitiateShare(file)}
+                        onClick={() => setSecureShareFile(file)}
                         type="button"
-                        title="Share Encrypted Key with Peer"
-                        className="p-1.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:text-[#2563EB] hover:border-blue-300 transition-colors"
+                        title="Share Securely with Human-Readable Code (SV-XXXX-...)"
+                        className="p-1.5 rounded-xl border border-blue-200 bg-blue-50/70 text-[#2563EB] hover:bg-blue-100 hover:border-blue-300 transition-colors"
                       >
                         <Share2 className="h-3.5 w-3.5" />
                       </button>
@@ -1172,6 +1190,25 @@ export function RecentFiles() {
           </div>
         </div>
       )}
+
+      {/* Create Secure Share Code Modal */}
+      {secureShareFile && (
+        <CreateSecureShareModal
+          isOpen={!!secureShareFile}
+          onClose={() => setSecureShareFile(null)}
+          file={secureShareFile}
+          vaultXId={vaultXIdentity?.id}
+          onShareCreated={() => {
+            refreshFiles();
+          }}
+        />
+      )}
+
+      {/* Receive Secure File Modal */}
+      <ReceiveSecureFileModal
+        isOpen={isReceiveModalOpen}
+        onClose={() => setIsReceiveModalOpen(false)}
+      />
     </div>
   );
 }

@@ -94,4 +94,33 @@ export const payloadService = {
   saveManifest(manifest: PayloadManifest): PayloadManifest {
     return payloadStore.createManifest(manifest);
   },
+
+  createShare(data: {
+    fileId: string;
+    ownerWallet: string;
+    expiresAt: string | null;
+    maxDownloads: number | null;
+    oneTime: boolean;
+    passwordProtected: boolean;
+    passwordHash?: string;
+  }) {
+    return payloadStore.createShare(data);
+  },
+
+  getShares(fileId: string, ownerWallet: string) {
+    return payloadStore.getSharesByFile(fileId, ownerWallet);
+  },
+
+  lookupShare(shareCode: string) {
+    return payloadStore.lookupShareByCode(shareCode);
+  },
+
+  accessShare(shareCode: string, passwordInput?: string) {
+    return payloadStore.accessShare(shareCode, passwordInput);
+  },
+
+  revokeShare(shareId: string, ownerWallet: string) {
+    return payloadStore.revokeShare(shareId, ownerWallet);
+  },
 };
+

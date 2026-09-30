@@ -4,7 +4,7 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { DashboardStats } from "@/components/dashboard/DashboardStats";
 import { RecentFiles } from "@/components/dashboard/RecentFiles";
-import { Upload, FolderLock, ShieldAlert, Activity } from "lucide-react";
+import { Upload, FolderLock, ShieldAlert, Activity, FileDown } from "lucide-react";
 import Link from "next/link";
 
 export const metadata: Metadata = {
@@ -23,6 +23,14 @@ export default function DashboardPage() {
       bg: "bg-blue-50",
     },
     {
+      title: "Receive Secure File",
+      description: "Enter a share code (SV-...)",
+      icon: FileDown,
+      href: "/receive",
+      color: "text-[#2563EB]",
+      bg: "bg-blue-50",
+    },
+    {
       title: "View Files",
       description: "Manage your encrypted files",
       icon: FolderLock,
@@ -35,14 +43,6 @@ export default function DashboardPage() {
       description: "Learn how it works",
       icon: ShieldAlert,
       href: "/#security",
-      color: "text-[#2563EB]",
-      bg: "bg-blue-50",
-    },
-    {
-      title: "Activity",
-      description: "View recent activity",
-      icon: Activity,
-      href: "#activity",
       color: "text-[#2563EB]",
       bg: "bg-blue-50",
     },
