@@ -21,6 +21,7 @@
  */
 
 import { fetchFromIpfs } from "@/lib/ipfs/gateway";
+import { decryptFileFromManifest, type FileManifest } from "./crypto/chunkedEngine";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -495,8 +496,34 @@ export async function downloadAndDecryptFromIpfs(
   _gatewayUrl?: string,
   onProgress?: (msg: string) => void
 ): Promise<DecryptedFileBundle> {
-  onProgress?.("Fetching ciphertext from IPFS network...");
+  onProgress?.("Fetching data from IPFS network...");
   const rawBuffer = await fetchFromIpfs(cid);
+
+  // Check if downloaded buffer is a FileManifest JSON (chunked file)
+  try {
+    const text = new TextDecoder().decode(rawBuffer);
+    if (text.trim().startsWith("{")) {
+      const parsed = JSON.parse(text);
+      if (parsed.algorithm === "AES-256-GCM" && Array.isArray(parsed.chunks)) {
+        onProgress?.("Detected chunked File Manifest. Verifying and decrypting chunks...");
+        const result = await decryptFileFromManifest(
+          parsed as FileManifest,
+          keyHex,
+          fetchFromIpfs,
+          (p) => onProgress?.(p.message)
+        );
+        onProgress?.("Triggering file download...");
+        downloadBlob(result.blob, result.fileName);
+        return {
+          plainBlob: result.blob,
+          originalName: result.fileName,
+          mimeType: result.mimeType,
+        };
+      }
+    }
+  } catch {
+    // Not a JSON manifest, proceed to monolithic bundle decryption
+  }
 
   onProgress?.("Decrypting AES-256-GCM in browser...");
   const blob = new Blob([rawBuffer], { type: "application/octet-stream" });

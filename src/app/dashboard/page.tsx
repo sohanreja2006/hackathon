@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { DashboardStats } from "@/components/dashboard/DashboardStats";
+import { SecurityStatus } from "@/components/dashboard/SecurityStatus";
 import { RecentFiles } from "@/components/dashboard/RecentFiles";
 import { Upload, FolderLock, ShieldAlert, Activity, FileDown } from "lucide-react";
 import Link from "next/link";
@@ -56,6 +57,9 @@ export default function DashboardPage() {
 
         {/* 4 Stat Cards */}
         <DashboardStats />
+
+        {/* Real Cryptographic & Custody Status */}
+        <SecurityStatus />
 
         {/* Quick Actions (Screen 4) */}
         <div className="mb-8">

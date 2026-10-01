@@ -18,6 +18,7 @@ import {
   User,
   QrCode,
   Zap,
+  Flame,
 } from "lucide-react";
 import { formatBytes } from "@/lib/crypto";
 import { OwlCompanion, OwlState } from "@/components/ui/OwlCompanion";
@@ -69,6 +70,8 @@ export function CreateSecureShareModal({
   const [expirationOption, setExpirationOption] = useState<"never" | "1h" | "24h" | "7d" | "30d">("24h");
   const [downloadLimitOption, setDownloadLimitOption] = useState<"1" | "5" | "10" | "unlimited">("unlimited");
   const [oneTime, setOneTime] = useState(false);
+  const [burnAfterReading, setBurnAfterReading] = useState(false);
+  const [burnDurationSeconds, setBurnDurationSeconds] = useState<number>(60);
 
   // Creation State
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -184,6 +187,8 @@ export function CreateSecureShareModal({
           expirationOption,
           downloadLimitOption,
           oneTime,
+          burnAfterReading,
+          burnDurationSeconds,
         },
         effectiveOwner
       );
@@ -226,6 +231,8 @@ export function CreateSecureShareModal({
     setRecipientError(null);
     setShareMode("e2ee");
     setOneTime(false);
+    setBurnAfterReading(false);
+    setBurnDurationSeconds(60);
     setOwlState("idle");
     onClose();
   };
@@ -477,6 +484,62 @@ export function CreateSecureShareModal({
                         className="h-4 w-4 rounded text-[#2563EB] focus:ring-[#2563EB] accent-[#2563EB] cursor-pointer"
                       />
                     </div>
+
+                    {/* Burn After Reading / Self-Destruct */}
+                    <div className="pt-2 border-t border-slate-100 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
+                            <Flame className={`h-3.5 w-3.5 ${burnAfterReading ? "text-amber-600 animate-pulse" : "text-slate-400"}`} />
+                            <span>Burn After Reading (Self-Destruct)</span>
+                          </div>
+                          <span className="text-[10px] text-slate-500 block">
+                            Cryptographically purges envelopes & revokes access on timer expiry
+                          </span>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={burnAfterReading}
+                          onChange={(e) => setBurnAfterReading(e.target.checked)}
+                          className="h-4 w-4 rounded text-amber-600 focus:ring-amber-500 accent-amber-600 cursor-pointer"
+                        />
+                      </div>
+
+                      {burnAfterReading && (
+                        <div className="p-2.5 rounded-xl bg-amber-50/70 border border-amber-200/80 space-y-1.5 animate-in fade-in duration-150">
+                          <label className="text-[11px] font-bold text-amber-950 flex items-center justify-between">
+                            <span>Self-Destruct Timer:</span>
+                            <span className="font-mono text-amber-800">
+                              {burnDurationSeconds >= 60 ? `${burnDurationSeconds / 60}m` : `${burnDurationSeconds}s`}
+                            </span>
+                          </label>
+                          <div className="grid grid-cols-4 gap-1">
+                            {[
+                              { label: "30s", val: 30 },
+                              { label: "60s (1m)", val: 60 },
+                              { label: "5m", val: 300 },
+                              { label: "15m", val: 900 },
+                            ].map((item) => (
+                              <button
+                                key={item.val}
+                                type="button"
+                                onClick={() => setBurnDurationSeconds(item.val)}
+                                className={`py-1 text-center rounded-lg text-[11px] font-bold transition-all border ${
+                                  burnDurationSeconds === item.val
+                                    ? "bg-amber-600 text-white border-amber-600 shadow-xs"
+                                    : "bg-white text-slate-700 border-amber-200 hover:bg-amber-100/50"
+                                }`}
+                              >
+                                {item.label}
+                              </button>
+                            ))}
+                          </div>
+                          <p className="text-[10px] text-amber-800 leading-tight">
+                            Live visual countdown activates as soon as the recipient decrypts the file.
+                          </p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -569,6 +632,12 @@ export function CreateSecureShareModal({
                       <Check className="h-3.5 w-3.5 text-emerald-600" />
                       <span>Integrity verified</span>
                     </div>
+                    {createdShare.burnAfterReading && (
+                      <div className="flex items-center gap-1.5 text-amber-700 font-medium">
+                        <Flame className="h-3.5 w-3.5 text-amber-600 animate-pulse" />
+                        <span>Self-destruct armed ({createdShare.burnDurationSeconds || 60}s countdown on read)</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Security Verification Fingerprint */}

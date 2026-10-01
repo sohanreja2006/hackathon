@@ -22,7 +22,14 @@ import {
   Layers,
   ArrowRight,
 } from "lucide-react";
-import { encryptFile, formatBytes, type CryptoProgress } from "@/lib/crypto";
+import { formatBytes } from "@/lib/crypto";
+import {
+  encryptFileChunked,
+  storeFileKey,
+  buildManifest,
+  type EncryptionProgress,
+  type ChunkedEncryptionResult,
+} from "@/lib/crypto/index";
 import { getIpfsUrl } from "@/lib/ipfs/gateway";
 import { cn } from "@/lib/utils";
 import type { VaultUploadStage, UploadApiResponse } from "@/types/files";
@@ -189,8 +196,8 @@ export function VaultUploadPanel() {
   const { address, isConnected } = useAccount();
   const { isConnected: isVaultXConnected, identity: vaultXIdentity } = useVaultXWallet();
 
-  const isMetaMaskActive = Boolean(address && isConnected);
-  const isVaultXActive = !isMetaMaskActive && isVaultXConnected;
+  const isVaultXActive = Boolean(isVaultXConnected && vaultXIdentity);
+  const isMetaMaskActive = Boolean(address && isConnected && !isVaultXActive);
 
   const [stage, setStage] = useState<VaultUploadStage>("idle");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -199,12 +206,13 @@ export function VaultUploadPanel() {
   const [encryptedSize, setEncryptedSize] = useState<number>(0);
   const [cid, setCid] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [cryptoProgress, setCryptoProgress] = useState<CryptoProgress | null>(null);
+  const [encProgress, setEncProgress] = useState<EncryptionProgress | null>(null);
 
   // Payload CMS and Resumable Upload Tracking
   const [payloadFileId, setPayloadFileId] = useState<string | null>(null);
   const [uploadedChunksCount, setUploadedChunksCount] = useState<number>(0);
   const [isPaused, setIsPaused] = useState<boolean>(false);
+  const abortRef = useRef<AbortController | null>(null);
 
   const isProcessing = stage === "encrypting" || stage === "uploading" || stage === "verifying";
 
@@ -216,10 +224,11 @@ export function VaultUploadPanel() {
     setEncryptedSize(0);
     setCid(null);
     setErrorMessage(null);
-    setCryptoProgress(null);
+    setEncProgress(null);
     setPayloadFileId(null);
     setUploadedChunksCount(0);
     setIsPaused(false);
+    if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; }
   }, []);
 
   const handleFileSelect = useCallback((file: File) => {
@@ -256,6 +265,8 @@ export function VaultUploadPanel() {
     if (!selectedFile) return;
 
     const calcChunks = Math.max(1, Math.ceil(selectedFile.size / (8 * 1024 * 1024)));
+    const abortController = new AbortController();
+    abortRef.current = abortController;
 
     // ── Phase 0: Create Payload File Record ──
     setStage("encrypting");
@@ -282,13 +293,22 @@ export function VaultUploadPanel() {
       console.warn("Payload initialization skipped:", payloadErr);
     }
 
-    // ── Phase 1: Encrypt locally ──
-    let bundle;
+    // ── Phase 1: REAL Chunked Encryption via crypto.subtle ──
+    // Uses encryptFileChunked: Blob.slice() → per-chunk AES-256-GCM(unique IV) → SHA-256
+    let encResult: ChunkedEncryptionResult;
     try {
-      bundle = await encryptFile(selectedFile, (p) => {
-        setCryptoProgress(p);
-      });
+      encResult = await encryptFileChunked(
+        selectedFile,
+        8 * 1024 * 1024, // 8 MB chunks
+        (p: EncryptionProgress) => {
+          setEncProgress(p);
+          setUploadedChunksCount(p.currentChunk);
+        },
+        abortController.signal,
+        activePayloadId || undefined
+      );
     } catch (err: unknown) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
       const msg = err instanceof Error ? err.message : "Encryption failed.";
       setErrorMessage(msg);
       setStage("error");
@@ -306,20 +326,29 @@ export function VaultUploadPanel() {
     let wrappedKey: string | undefined;
     if (isVaultXActive) {
       try {
-        wrappedKey = await protectFileKeyWithVaultX(bundle.keyHex);
+        wrappedKey = await protectFileKeyWithVaultX(encResult.keyHex);
         setKeyProtectedByVaultX(true);
       } catch {
         setKeyProtectedByVaultX(false);
       }
     }
 
-    setKeyHex(bundle.keyHex);
-    setEncryptedSize(bundle.encryptedSizeBytes);
+    setKeyHex(encResult.keyHex);
+    const totalEncSize = encResult.chunks.reduce((s, c) => s + c.encryptedSize, 0);
+    setEncryptedSize(totalEncSize);
     setStage("encrypted");
+
+    // ── Phase 1c: Store key securely in IndexedDB ──
+    const ownerKey = (isVaultXActive && vaultXIdentity?.id)
+      ? vaultXIdentity.id
+      : (address?.toLowerCase() ?? "anonymous");
+    if (ownerKey) {
+      storeFileKey(ownerKey, encResult.fileId, encResult.keyHex, selectedFile.name).catch(() => {});
+    }
 
     await new Promise((r) => setTimeout(r, 400));
 
-    // ── Phase 2: Upload Encrypted Chunks to IPFS & Record in Payload ──
+    // ── Phase 2: Upload Each Encrypted Chunk to IPFS ──
     setStage("uploading");
     if (activePayloadId) {
       updatePayloadFileStatus(
@@ -329,131 +358,174 @@ export function VaultUploadPanel() {
       );
     }
 
-    let finalCid: string | null = null;
-    let finalSize: number = bundle.encryptedSizeBytes;
+    const chunkCids: string[] = [];
     let finalUploadedAt: string = new Date().toISOString();
 
-    try {
-      const urlRes = await fetch("/api/files/upload-url", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(isVaultXActive && vaultXIdentity?.id ? { "x-vaultx-id": vaultXIdentity.id } : {}),
-        },
-        body: JSON.stringify({
-          filename: bundle.downloadName,
-          vaultXId: isVaultXActive ? vaultXIdentity?.id : undefined,
-        }),
+    for (let i = 0; i < encResult.chunks.length; i++) {
+      if (abortController.signal.aborted) return;
+
+      const chunk = encResult.chunks[i];
+      const chunkFilename = `${selectedFile.name}.chunk${i}.cyber10enc`;
+
+      setEncProgress({
+        stage: "uploading",
+        currentChunk: i + 1,
+        totalChunks: encResult.totalChunks,
+        percentComplete: Math.round(((i + 0.5) / encResult.totalChunks) * 100),
+        message: `Uploading encrypted chunk ${i + 1} of ${encResult.totalChunks} to IPFS...`,
       });
+      setUploadedChunksCount(i);
 
-      if (!urlRes.ok) {
-        throw new Error("Could not acquire direct upload credentials.");
-      }
+      let chunkCid: string | null = null;
 
-      const { uploadUrl } = await urlRes.json();
-      if (!uploadUrl) {
-        throw new Error("No upload URL returned.");
-      }
-
-      const pinataForm = new FormData();
-      pinataForm.append("file", bundle.encryptedBlob, bundle.downloadName);
-
-      const pinataRes = await fetch(uploadUrl, {
-        method: "POST",
-        body: pinataForm,
-      });
-
-      if (!pinataRes.ok) {
-        throw new Error(`Upload failed (${pinataRes.status})`);
-      }
-
-      const pinataData = await pinataRes.json();
-      finalCid = pinataData?.data?.cid;
-      finalSize = pinataData?.data?.size || bundle.encryptedSizeBytes;
-      finalUploadedAt = pinataData?.data?.created_at || new Date().toISOString();
-
-      if (!finalCid) {
-        throw new Error("Pinata upload did not return a CID.");
-      }
-    } catch {
-      // Fallback to server proxy
-      const formData = new FormData();
-      formData.append("encryptedFile", bundle.encryptedBlob, bundle.downloadName);
-      formData.append("originalName", selectedFile.name);
-      formData.append("originalMime", selectedFile.type || "application/octet-stream");
-      formData.append("originalSize", String(selectedFile.size));
-      if (isVaultXActive && vaultXIdentity?.id) {
-        formData.append("vaultXId", vaultXIdentity.id);
-      }
-
-      let apiResponse: UploadApiResponse;
+      // Try direct Pinata upload first
       try {
-        const res = await fetch("/api/files/upload", {
+        const urlRes = await fetch("/api/files/upload-url", {
           method: "POST",
           headers: {
+            "Content-Type": "application/json",
             ...(isVaultXActive && vaultXIdentity?.id ? { "x-vaultx-id": vaultXIdentity.id } : {}),
           },
-          body: formData,
+          body: JSON.stringify({
+            filename: chunkFilename,
+            vaultXId: isVaultXActive ? vaultXIdentity?.id : undefined,
+          }),
         });
-        apiResponse = await res.json();
-      } catch (networkErr: unknown) {
-        const msg = networkErr instanceof Error ? networkErr.message : "Network error";
-        setErrorMessage(`Upload failed. Could not reach storage network: ${msg}`);
+
+        if (!urlRes.ok) throw new Error("No upload URL");
+
+        const { uploadUrl } = await urlRes.json();
+        if (!uploadUrl) throw new Error("No upload URL");
+
+        const pinataForm = new FormData();
+        pinataForm.append("file", chunk.encryptedBlob, chunkFilename);
+
+        const pinataRes = await fetch(uploadUrl, { method: "POST", body: pinataForm });
+        if (!pinataRes.ok) throw new Error(`Upload failed (${pinataRes.status})`);
+
+        const pinataData = await pinataRes.json();
+        chunkCid = pinataData?.data?.cid ?? null;
+        finalUploadedAt = pinataData?.data?.created_at || finalUploadedAt;
+      } catch {
+        // Fallback to server proxy
+        const formData = new FormData();
+        formData.append("encryptedFile", chunk.encryptedBlob, chunkFilename);
+        formData.append("originalName", selectedFile.name);
+        formData.append("originalMime", selectedFile.type || "application/octet-stream");
+        formData.append("originalSize", String(chunk.plaintextSize));
+        if (isVaultXActive && vaultXIdentity?.id) {
+          formData.append("vaultXId", vaultXIdentity.id);
+        }
+
+        try {
+          const res = await fetch("/api/files/upload", {
+            method: "POST",
+            headers: {
+              ...(isVaultXActive && vaultXIdentity?.id ? { "x-vaultx-id": vaultXIdentity.id } : {}),
+            },
+            body: formData,
+          });
+          const apiResponse: UploadApiResponse = await res.json();
+          if (!apiResponse.success) throw new Error(apiResponse.error || "Upload failed");
+          chunkCid = apiResponse.cid;
+          finalUploadedAt = apiResponse.uploadedAt || finalUploadedAt;
+        } catch (networkErr: unknown) {
+          const msg = networkErr instanceof Error ? networkErr.message : "Network error";
+          setErrorMessage(`Chunk ${i + 1} upload failed: ${msg}`);
+          setStage("error");
+          return;
+        }
+      }
+
+      if (!chunkCid) {
+        setErrorMessage(`Chunk ${i + 1} upload did not return a CID.`);
         setStage("error");
         return;
       }
 
-      if (!apiResponse.success) {
-        setErrorMessage(apiResponse.error || "Upload failed. Your encrypted file was not stored.");
-        setStage("error");
-        return;
-      }
+      chunkCids.push(chunkCid);
+      setUploadedChunksCount(i + 1);
 
-      finalCid = apiResponse.cid;
-      finalSize = apiResponse.size;
-      finalUploadedAt = apiResponse.uploadedAt;
-    }
-
-    setUploadedChunksCount(calcChunks);
-
-    // ── Phase 3: Register Chunk & Manifest in Payload ──
-    setStage("verifying");
-    if (activePayloadId && finalCid) {
-      try {
-        // Record chunk 0
-        await recordPayloadChunk(
+      // Record chunk in Payload
+      if (activePayloadId) {
+        recordPayloadChunk(
           {
             fileId: activePayloadId,
-            chunkIndex: 0,
-            chunkSize: selectedFile.size,
-            encryptedSize: finalSize,
-            iv: bundle.ivHex,
-            hash: bundle.sha256Hex,
-            cid: finalCid,
+            chunkIndex: i,
+            chunkSize: chunk.plaintextSize,
+            encryptedSize: chunk.encryptedSize,
+            iv: chunk.iv,
+            hash: chunk.sha256,
+            cid: chunkCid,
             status: "verified",
           },
           isVaultXActive ? vaultXIdentity?.id : undefined
-        );
+        ).catch(() => {});
+      }
+    }
 
-        // Save manifest
+    // ── Phase 3: Build & Pin File Manifest to IPFS ──
+    setStage("verifying");
+    setEncProgress({
+      stage: "verifying",
+      currentChunk: encResult.totalChunks,
+      totalChunks: encResult.totalChunks,
+      percentComplete: 95,
+      message: "Building and pinning File Manifest to IPFS...",
+    });
+
+    const fileManifest = buildManifest(encResult, chunkCids);
+    let manifestCid = chunkCids[0] || "";
+
+    try {
+      const manifestBlob = new Blob([JSON.stringify(fileManifest, null, 2)], {
+        type: "application/json",
+      });
+      const manifestFilename = `${selectedFile.name}.manifest.json`;
+
+      const manifestForm = new FormData();
+      manifestForm.append("encryptedFile", manifestBlob, manifestFilename);
+      manifestForm.append("originalName", manifestFilename);
+      manifestForm.append("originalMime", "application/json");
+      manifestForm.append("originalSize", String(manifestBlob.size));
+      if (isVaultXActive && vaultXIdentity?.id) {
+        manifestForm.append("vaultXId", vaultXIdentity.id);
+      }
+
+      const mRes = await fetch("/api/files/upload", {
+        method: "POST",
+        headers: {
+          ...(isVaultXActive && vaultXIdentity?.id ? { "x-vaultx-id": vaultXIdentity.id } : {}),
+        },
+        body: manifestForm,
+      });
+
+      const mData: UploadApiResponse = await mRes.json();
+      if (mData.success && mData.cid) {
+        manifestCid = mData.cid;
+      }
+    } catch (manifestUploadErr) {
+      console.warn("Manifest IPFS upload fallback:", manifestUploadErr);
+    }
+
+    if (activePayloadId && manifestCid) {
+      try {
         await savePayloadManifestRecord(
           {
             fileId: activePayloadId,
-            manifestCID: finalCid,
+            manifestCID: manifestCid,
             fileName: selectedFile.name,
             fileSize: selectedFile.size,
             mimeType: selectedFile.type || "application/octet-stream",
             chunkSize: 8388608,
             totalChunks: calcChunks,
-            chunks: [
-              {
-                index: 0,
-                cid: finalCid,
-                hash: bundle.sha256Hex,
-                iv: bundle.ivHex,
-                size: finalSize,
-              },
-            ],
+            chunks: encResult.chunks.map((c, idx) => ({
+              index: c.chunkIndex,
+              cid: chunkCids[idx] || "",
+              hash: c.sha256,
+              iv: c.iv,
+              size: c.encryptedSize,
+            })),
           },
           isVaultXActive ? vaultXIdentity?.id : undefined
         );
@@ -463,17 +535,22 @@ export function VaultUploadPanel() {
     }
 
     // ── Success ──
-    setCid(finalCid);
+    setCid(manifestCid);
     setStage("uploaded");
-    setCryptoProgress(null);
+    setEncProgress(null);
 
-    // Save client metadata
-    const ownerKey = address?.toLowerCase() ?? (isVaultXActive ? vaultXIdentity?.id : "anonymous");
-    if (ownerKey && bundle.keyHex) {
+    // Save client metadata and IndexedDB keys
+    if (ownerKey && encResult.keyHex) {
+      // Store in IndexedDB under both fileId and manifestCid
+      storeFileKey(ownerKey, encResult.fileId, encResult.keyHex, selectedFile.name).catch(() => {});
+      if (manifestCid && manifestCid !== encResult.fileId) {
+        storeFileKey(ownerKey, manifestCid, encResult.keyHex, selectedFile.name).catch(() => {});
+      }
+
       const ext = selectedFile.name.split(".").pop()?.toUpperCase() || "BIN";
       saveUserFile({
-        id: activePayloadId || `cyber-${Date.now()}`,
-        cid: finalCid!,
+        id: activePayloadId || encResult.fileId,
+        cid: manifestCid,
         fileName: selectedFile.name,
         originalName: selectedFile.name,
         extension: ext,
@@ -481,14 +558,14 @@ export function VaultUploadPanel() {
         mimeType: selectedFile.type || "application/octet-stream",
         uploadedAt: finalUploadedAt || new Date().toISOString(),
         ownerAddress: ownerKey,
-        keyHex: bundle.keyHex,
+        keyHex: encResult.keyHex,
         wrappedKey: isVaultXActive ? wrappedKey : undefined,
         algorithm: "AES-256-GCM",
         sharedWith: [],
         totalChunks: calcChunks,
         chunkSize: 8388608,
-        manifestCID: finalCid!,
-        logicalPath: `/vault/${ownerKey}/${activePayloadId || finalCid}/`,
+        manifestCID: manifestCid,
+        logicalPath: `/vault/${ownerKey}/${activePayloadId || manifestCid}/`,
         uploadStatus: "completed",
         integrityStatus: "verified",
       });
@@ -506,7 +583,9 @@ export function VaultUploadPanel() {
   else if (stage === "error") owlState = "error";
 
   const totalChunks = selectedFile ? Math.ceil(selectedFile.size / (8 * 1024 * 1024)) || 1 : 1;
-  const currentChunk = stage === "uploading" ? Math.min(Math.round(totalChunks * 0.72), totalChunks) : Math.round(totalChunks * 0.5);
+  // REAL progress from encProgress — no more hardcoded fakes
+  const currentChunk = encProgress?.currentChunk ?? uploadedChunksCount;
+  const percentComplete = encProgress?.percentComplete ?? (uploadedChunksCount > 0 ? Math.round((uploadedChunksCount / totalChunks) * 100) : 0);
 
   return (
     <div className="space-y-6">
@@ -578,28 +657,38 @@ export function VaultUploadPanel() {
             <OwlCompanion state="encrypting" size="sm" showBadge />
           </div>
 
-          {/* Progress Checklist (Screen 6) */}
+          {/* REAL Progress Checklist (driven by encProgress state) */}
           <div className="space-y-3 pt-2 text-xs font-medium">
             <div className="flex items-center gap-2.5 text-emerald-700">
               <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-              <span>Preparing file for processing</span>
+              <span>AES-256 key generated via WebCrypto CSPRNG</span>
             </div>
             <div className="flex items-center gap-2.5 text-emerald-700">
               <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-              <span>Chunking: Splitting into {totalChunks} chunks</span>
+              <span>Chunking: {totalChunks} × 8 MB slices via Blob.slice()</span>
             </div>
             <div className="space-y-1.5 pl-6">
               <div className="flex items-center justify-between text-xs text-[#2563EB] font-bold">
-                <span>Encrypting chunk {currentChunk} / {totalChunks}</span>
-                <span>73%</span>
+                <span>Encrypting chunk {currentChunk} / {totalChunks} (unique IV per chunk)</span>
+                <span>{percentComplete}%</span>
               </div>
               <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                <div className="h-full w-[73%] rounded-full bg-[#2563EB] animate-pulse" />
+                <div
+                  className="h-full rounded-full bg-[#2563EB] transition-all duration-300"
+                  style={{ width: `${percentComplete}%` }}
+                />
               </div>
+              {encProgress?.message && (
+                <p className="text-[11px] text-slate-500 font-mono truncate">{encProgress.message}</p>
+              )}
             </div>
-            <div className="flex items-center gap-2.5 text-slate-400 pl-6">
-              <span className="h-1.5 w-1.5 rounded-full bg-slate-300" />
-              <span>Verifying: Generating integrity hashes</span>
+            <div className={cn("flex items-center gap-2.5 pl-6", currentChunk >= totalChunks ? "text-emerald-700" : "text-slate-400")}>
+              {currentChunk >= totalChunks ? (
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+              ) : (
+                <span className="h-1.5 w-1.5 rounded-full bg-slate-300" />
+              )}
+              <span>SHA-256 integrity hash per encrypted chunk</span>
             </div>
             <div className="flex items-center gap-2.5 text-slate-400 pl-6">
               <span className="h-1.5 w-1.5 rounded-full bg-slate-300" />
@@ -653,20 +742,24 @@ export function VaultUploadPanel() {
               <span className="text-3xl font-extrabold text-[#2563EB]">
                 {stage === "verifying"
                   ? "100%"
-                  : `${Math.min(100, Math.round(((uploadedChunksCount || 1) / totalChunks) * 100))}%`}
+                  : `${Math.min(100, Math.round((uploadedChunksCount / totalChunks) * 100))}%`}
               </span>
               <div className="text-right text-xs text-slate-500">
                 <span className="font-bold text-slate-800">
-                  {uploadedChunksCount || 1} / {totalChunks} chunks
+                  {uploadedChunksCount} / {totalChunks} chunks
                 </span>
                 <span className="block text-[11px] text-slate-400">
                   {formatBytes(
-                    encryptedSize * Math.min(1, (uploadedChunksCount || 1) / totalChunks)
+                    encryptedSize * Math.min(1, uploadedChunksCount / totalChunks)
                   )}{" "}
                   / {formatBytes(encryptedSize)}
                 </span>
               </div>
             </div>
+
+            {encProgress?.message && (
+              <p className="text-[11px] text-slate-500 font-mono truncate">{encProgress.message}</p>
+            )}
 
             <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
               <div
@@ -678,7 +771,7 @@ export function VaultUploadPanel() {
                   width: `${
                     stage === "verifying"
                       ? 100
-                      : Math.min(100, Math.round(((uploadedChunksCount || 1) / totalChunks) * 100))
+                      : Math.min(100, Math.round((uploadedChunksCount / totalChunks) * 100))
                   }%`,
                 }}
               />

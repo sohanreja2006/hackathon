@@ -53,6 +53,9 @@ export function ConnectWalletModal({
   const handleCreateVaultX = async () => {
     setErrorMsg(null);
     try {
+      if (isMetaMaskConnected) {
+        disconnectMetaMask();
+      }
       if (hasExistingWallet) {
         await unlockWallet();
       } else {
@@ -136,8 +139,7 @@ export function ConnectWalletModal({
               </button>
 
               {/* Local Secure Key Wallet Option */}
-              <button
-                type="button"
+              <div
                 onClick={() => {
                   if (isVaultXConnected) {
                     onClose();
@@ -145,8 +147,20 @@ export function ConnectWalletModal({
                     handleCreateVaultX();
                   }
                 }}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    if (isVaultXConnected) {
+                      onClose();
+                    } else {
+                      handleCreateVaultX();
+                    }
+                  }
+                }}
                 className={cn(
-                  "w-full flex items-center justify-between p-4 rounded-2xl border transition-all duration-200 group",
+                  "w-full flex items-center justify-between p-4 rounded-2xl border transition-all duration-200 group cursor-pointer select-none",
                   isVaultXConnected
                     ? "border-blue-300 bg-blue-50/50"
                     : "border-slate-200 bg-white hover:border-blue-400 hover:bg-blue-50/30"
@@ -191,7 +205,7 @@ export function ConnectWalletModal({
                     <ChevronRight className="h-4 w-4 text-slate-400 group-hover:text-[#2563EB] group-hover:translate-x-0.5 transition-all" />
                   </div>
                 )}
-              </button>
+              </div>
             </div>
 
             {/* Primary Action Button */}

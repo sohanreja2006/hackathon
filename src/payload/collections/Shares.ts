@@ -1,36 +1,44 @@
+import type { CollectionConfig } from "payload";
+
 /**
  * Payload CMS Collection: Shares
  *
- * Stores end-to-end encrypted key envelopes, recipient public key fingerprints,
- * expiration, download count limits, and share permissions.
- *
- * ZERO-KNOWLEDGE GUARANTEE:
- * - NEVER stores plaintext AES encryption keys.
- * - NEVER stores recipient private keys.
- * - Only stores asymmetric key agreement metadata and ciphertext envelopes.
+ * Stores access grants and key agreement envelopes for sharing encrypted files.
+ * NEVER stores raw AES file keys. Only stores wrapped key envelopes.
  */
-
-export const SharesCollection = {
+export const SharesCollection: CollectionConfig = {
   slug: "shares",
   admin: {
-    useAsTitle: "shareCode",
+    useAsTitle: "shareId",
     defaultColumns: [
-      "shareCode",
-      "fileName",
+      "shareId",
+      "fileId",
       "ownerWallet",
-      "recipientUserId",
+      "recipient",
       "status",
       "downloadCount",
       "expiresAt",
-      "createdAt",
     ],
+  },
+  access: {
+    read: () => true, // Access verified dynamically in endpoint
+    create: ({ req: { user } }) => Boolean(user),
+    update: ({ req: { user } }) => Boolean(user),
+    delete: ({ req: { user } }) => Boolean(user),
   },
   fields: [
     {
-      name: "shareCode",
+      name: "shareId",
       type: "text",
       required: true,
       unique: true,
+      index: true,
+    },
+    {
+      name: "file",
+      type: "relationship",
+      relationTo: "files",
+      required: false,
       index: true,
     },
     {
@@ -40,81 +48,56 @@ export const SharesCollection = {
       index: true,
     },
     {
-      name: "fileName",
-      type: "text",
-      required: true,
-    },
-    {
-      name: "fileSize",
-      type: "number",
-      required: true,
-    },
-    {
-      name: "mimeType",
-      type: "text",
-      required: true,
+      name: "owner",
+      type: "relationship",
+      relationTo: "users",
+      required: false,
+      index: true,
     },
     {
       name: "ownerWallet",
       type: "text",
       required: true,
       index: true,
+      hooks: {
+        beforeValidate: [
+          ({ value }) => (typeof value === "string" ? value.toLowerCase() : value),
+        ],
+      },
     },
     {
-      name: "manifestCID",
+      name: "recipient",
       type: "text",
-      required: false,
-    },
-    {
-      name: "recipientUserId",
-      type: "text",
-      required: false,
+      required: true,
       index: true,
+      hooks: {
+        beforeValidate: [
+          ({ value }) => (typeof value === "string" ? value.toLowerCase() : value),
+        ],
+      },
     },
     {
       name: "recipientPublicKeyFingerprint",
       type: "text",
-      required: false,
     },
     {
       name: "encryptedFileKey",
-      type: "textarea",
-      required: false,
+      type: "text",
+      required: true,
     },
     {
       name: "keyAgreementMetadata",
       type: "json",
-      required: false,
-    },
-    {
-      name: "isQuickShare",
-      type: "checkbox",
-      defaultValue: false,
-    },
-    {
-      name: "quickShareEnvelope",
-      type: "textarea",
-      required: false,
-    },
-    {
-      name: "encryptionAlgorithm",
-      type: "text",
-      defaultValue: "AES-256-GCM",
-    },
-    {
-      name: "integrityAlgorithm",
-      type: "text",
-      defaultValue: "SHA-256",
     },
     {
       name: "expiresAt",
       type: "date",
-      required: false,
+      index: true,
     },
     {
       name: "maxDownloads",
       type: "number",
-      required: false,
+      defaultValue: 1,
     },
     {
       name: "downloadCount",
@@ -127,14 +110,14 @@ export const SharesCollection = {
       defaultValue: false,
     },
     {
-      name: "passwordProtected",
+      name: "burnAfterReading",
       type: "checkbox",
       defaultValue: false,
     },
     {
-      name: "passwordHash",
-      type: "text",
-      required: false,
+      name: "burnDurationSeconds",
+      type: "number",
+      defaultValue: 60,
     },
     {
       name: "status",
@@ -146,17 +129,15 @@ export const SharesCollection = {
         { label: "Download Limit Reached", value: "download-limit-reached" },
       ],
       defaultValue: "active",
-      index: true,
-    },
-    {
-      name: "createdAt",
-      type: "date",
       required: true,
+      index: true,
     },
     {
       name: "lastAccessedAt",
       type: "date",
-      required: false,
     },
   ],
+  timestamps: true,
 };
+
+export default SharesCollection;

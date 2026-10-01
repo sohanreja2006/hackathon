@@ -28,6 +28,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { decryptFile, downloadBlob, formatBytes } from "@/lib/crypto";
+import { decryptFileFromManifest, type FileManifest, retrieveFileKey } from "@/lib/crypto/index";
 import { fetchFromIpfs, getIpfsUrl, isValidCid, getGatewayBase } from "@/lib/ipfs/gateway";
 import { cn } from "@/lib/utils";
 import { useVaultXWallet } from "@/context/VaultXWalletContext";
@@ -53,16 +54,33 @@ export function VaultRetrievePanel() {
 
   // When CID changes, check if there is a saved key available
   useEffect(() => {
-    setSavedVaultKey(null);
-    const cid = cidInput.trim();
-    if (!isValidCid(cid)) return;
-
     let cancelled = false;
-    const ownerKey = address?.toLowerCase() ?? vaultXIdentity?.id ?? "";
-    if (!ownerKey) return;
+    const cid = cidInput.trim();
+    if (!isValidCid(cid)) {
+      setSavedVaultKey(null);
+      return;
+    }
 
+    const ownerKey = (isVaultXConnected && vaultXIdentity?.id)
+      ? vaultXIdentity.id
+      : (address?.toLowerCase() ?? "");
+    if (!ownerKey) {
+      setSavedVaultKey(null);
+      return;
+    }
+
+    // Check IndexedDB key vault first
+    retrieveFileKey(ownerKey, cid)
+      .then((key) => {
+        if (!cancelled && key) {
+          setSavedVaultKey(key);
+        }
+      })
+      .catch(() => {});
+
+    // Check localStorage file records
     const files = getUserFiles(ownerKey);
-    const match = files.find((f) => f.cid === cid);
+    const match = files.find((f) => f.cid === cid || f.manifestCID === cid || f.id === cid);
 
     if (match?.wrappedKey && isVaultXConnected) {
       unlockFileKeyWithVaultX(match.wrappedKey)
@@ -74,6 +92,8 @@ export function VaultRetrievePanel() {
         .catch(() => {});
     } else if (match?.keyHex) {
       setSavedVaultKey(match.keyHex);
+    } else {
+      setSavedVaultKey(null);
     }
 
     return () => { cancelled = true; };
@@ -99,9 +119,9 @@ export function VaultRetrievePanel() {
     setStage("fetching");
     setErrorMessage(null);
     setResult(null);
-    setStatusMessage("Fetching encrypted data from IPFS gateway...");
+    setStatusMessage("Fetching data from IPFS gateway...");
 
-    // ── 1. Fetch encrypted bytes from IPFS gateway ──────────────────────────
+    // ── 1. Fetch bytes from IPFS gateway ──────────────────────────
     let rawBuffer: ArrayBuffer;
     try {
       rawBuffer = await fetchFromIpfs(cid);
@@ -115,26 +135,60 @@ export function VaultRetrievePanel() {
     setStage("decrypting");
     setStatusMessage("Verifying integrity & decrypting in browser...");
 
-    // ── 2. Decrypt in the browser using the WebCrypto engine ───────────
-    const encryptedFile = new File([rawBuffer], `${cid}.cyber10enc`, {
-      type: "application/octet-stream",
-    });
-
+    // ── 2. Decrypt in browser (supports Chunked Manifests & legacy bundles) ───
     try {
-      const decrypted = await decryptFile(encryptedFile, key, (p) => {
-        setStatusMessage(p.message);
-      });
+      let isManifest = false;
+      let manifest: FileManifest | null = null;
+
+      try {
+        const text = new TextDecoder().decode(rawBuffer);
+        if (text.trim().startsWith("{")) {
+          const parsed = JSON.parse(text);
+          if (parsed.algorithm === "AES-256-GCM" && Array.isArray(parsed.chunks)) {
+            isManifest = true;
+            manifest = parsed as FileManifest;
+          }
+        }
+      } catch {
+        // Not a JSON manifest
+      }
+
+      let decryptedBlob: Blob;
+      let decryptedName: string;
+
+      if (isManifest && manifest) {
+        setStatusMessage(`Detected File Manifest with ${manifest.totalChunks} chunks. Verifying and decrypting...`);
+        const manifestResult = await decryptFileFromManifest(
+          manifest,
+          key,
+          fetchFromIpfs,
+          (p) => {
+            setStatusMessage(p.message);
+          }
+        );
+        decryptedBlob = manifestResult.blob;
+        decryptedName = manifestResult.fileName;
+      } else {
+        const encryptedFile = new File([rawBuffer], `${cid}.cyber10enc`, {
+          type: "application/octet-stream",
+        });
+        const decrypted = await decryptFile(encryptedFile, key, (p) => {
+          setStatusMessage(p.message);
+        });
+        decryptedBlob = decrypted.plainBlob;
+        decryptedName = decrypted.originalName;
+      }
 
       setResult({
-        blob: decrypted.plainBlob,
-        name: decrypted.originalName,
-        size: decrypted.plainBlob.size,
+        blob: decryptedBlob,
+        name: decryptedName,
+        size: decryptedBlob.size,
       });
       setStage("done");
       setStatusMessage("Decryption complete. Downloading file...");
 
       // Automatically trigger browser file download
-      downloadBlob(decrypted.plainBlob, decrypted.originalName);
+      downloadBlob(decryptedBlob, decryptedName);
     } catch (err: unknown) {
       const msg =
         err instanceof Error ? err.message : "Decryption failed.";

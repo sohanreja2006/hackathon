@@ -1,32 +1,73 @@
+import type { CollectionConfig } from "payload";
+
 /**
  * Payload CMS Collection: Files
  *
  * Stores metadata and upload status for Drive-style files.
- * NEVER stores plaintext data.
+ * NEVER stores plaintext data or raw encryption keys.
  */
-
-export const FilesCollection = {
+export const FilesCollection: CollectionConfig = {
   slug: "files",
   admin: {
-    useAsTitle: "originalName",
+    useAsTitle: "filename",
     defaultColumns: [
-      "originalName",
+      "filename",
       "ownerWallet",
       "size",
-      "uploadStatus",
-      "integrityStatus",
+      "status",
+      "manifestCID",
       "createdAt",
     ],
   },
+  access: {
+    read: ({ req: { user } }) => {
+      if (!user) return false;
+      return {
+        owner: { equals: user.id },
+      };
+    },
+    create: ({ req: { user } }) => Boolean(user),
+    update: ({ req: { user } }) => {
+      if (!user) return false;
+      return {
+        owner: { equals: user.id },
+      };
+    },
+    delete: ({ req: { user } }) => {
+      if (!user) return false;
+      return {
+        owner: { equals: user.id },
+      };
+    },
+  },
   fields: [
+    {
+      name: "fileId",
+      type: "text",
+      required: true,
+      unique: true,
+      index: true,
+    },
+    {
+      name: "owner",
+      type: "relationship",
+      relationTo: "users",
+      required: true,
+      index: true,
+    },
     {
       name: "ownerWallet",
       type: "text",
       required: true,
       index: true,
+      hooks: {
+        beforeValidate: [
+          ({ value }) => (typeof value === "string" ? value.toLowerCase() : value),
+        ],
+      },
     },
     {
-      name: "originalName",
+      name: "filename",
       type: "text",
       required: true,
     },
@@ -67,47 +108,31 @@ export const FilesCollection = {
     {
       name: "manifestCID",
       type: "text",
+      index: true,
     },
     {
-      name: "uploadStatus",
+      name: "status",
       type: "select",
       options: [
-        { label: "Pending", value: "pending" },
+        { label: "Preparing", value: "preparing" },
         { label: "Encrypting", value: "encrypting" },
         { label: "Uploading", value: "uploading" },
         { label: "Paused", value: "paused" },
         { label: "Verifying", value: "verifying" },
-        { label: "Completed", value: "completed" },
+        { label: "Complete", value: "complete" },
         { label: "Failed", value: "failed" },
+        { label: "Deleted", value: "deleted" },
       ],
-      defaultValue: "pending",
+      defaultValue: "preparing",
       required: true,
-    },
-    {
-      name: "integrityStatus",
-      type: "select",
-      options: [
-        { label: "Pending", value: "pending" },
-        { label: "Verified", value: "verified" },
-        { label: "Failed", value: "failed" },
-      ],
-      defaultValue: "pending",
-      required: true,
+      index: true,
     },
     {
       name: "logicalPath",
       type: "text",
-      required: true,
-    },
-    {
-      name: "createdAt",
-      type: "date",
-      required: true,
-    },
-    {
-      name: "updatedAt",
-      type: "date",
-      required: true,
     },
   ],
+  timestamps: true,
 };
+
+export default FilesCollection;

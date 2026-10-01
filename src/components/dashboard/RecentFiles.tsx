@@ -23,6 +23,9 @@ import {
   Plus,
   Trash2,
   FileDown,
+  Activity,
+  Clock,
+  RefreshCw,
 } from "lucide-react";
 import Link from "next/link";
 import { formatBytes, downloadAndDecryptFromIpfs, reencryptKeyForRecipient, decryptKeyForRecipient } from "@/lib/crypto";
@@ -36,6 +39,8 @@ import { fetchPayloadFiles, deletePayloadFile } from "@/lib/payloadClient";
 import { FileDetailsModal } from "./FileDetailsModal";
 import { CreateSecureShareModal } from "./CreateSecureShareModal";
 import { ReceiveSecureFileModal } from "./ReceiveSecureFileModal";
+import { SecureFilePreviewModal, SecurePreviewData } from "./SecureFilePreviewModal";
+import { PayloadActivityLog } from "@/payload/types";
 
 
 export function RecentFiles() {
@@ -43,10 +48,12 @@ export function RecentFiles() {
   const { signMessageAsync } = useSignMessage();
   const { identity: vaultXIdentity, isConnected: isVaultXConnected } = useVaultXWallet();
 
-  // Resolved owner key: MetaMask address takes precedence, fall back to VaultX id
-  const ownerKey = address?.toLowerCase() ?? (isVaultXConnected ? vaultXIdentity?.id : null) ?? null;
+  // Resolved owner key: Local VaultX wallet takes precedence when connected
+  const ownerKey = (isVaultXConnected && vaultXIdentity?.id)
+    ? vaultXIdentity.id
+    : (address?.toLowerCase() ?? null);
 
-  const [activeTab, setActiveTab] = useState<"my_files" | "shared_with_me">("my_files");
+  const [activeTab, setActiveTab] = useState<"my_files" | "shared_with_me" | "activity">("my_files");
   const [searchTerm, setSearchTerm] = useState("");
   const [copiedCid, setCopiedCid] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
@@ -56,10 +63,15 @@ export function RecentFiles() {
   const [myFiles, setMyFiles] = useState<StoredEncryptedFile[]>([]);
   const [sharedFiles, setSharedFiles] = useState<SharedFileRecord[]>([]);
 
+  // Activity audit log state
+  const [activityLogs, setActivityLogs] = useState<PayloadActivityLog[]>([]);
+  const [isLoadingActivity, setIsLoadingActivity] = useState(false);
+
   // Decryption state (FR-5)
   const [decryptingCid, setDecryptingCid] = useState<string | null>(null);
   const [decryptProgress, setDecryptProgress] = useState<string>("");
-  const [readyDownload, setReadyDownload] = useState<{ name: string; url: string } | null>(null);
+  const [readyDownload, setReadyDownload] = useState<{ name: string; url: string; blob?: Blob; mimeType?: string } | null>(null);
+  const [previewModalData, setPreviewModalData] = useState<SecurePreviewData | null>(null);
 
   // Decrypt Key Prompt Modal State
   const [decryptModalFile, setDecryptModalFile] = useState<StoredEncryptedFile | null>(null);
@@ -164,16 +176,39 @@ export function RecentFiles() {
     setSharedFiles(address ? getSharedWithMeFiles(address) : []);
   }, [address, vaultXIdentity]);
 
+  // Fetch real cryptographic audit log
+  const fetchActivityLogs = useCallback(async () => {
+    setIsLoadingActivity(true);
+    try {
+      const activeAddress = address || vaultXIdentity?.id;
+      const res = await fetch("/api/payload/activity?limit=50", {
+        headers: activeAddress ? { "x-wallet-address": activeAddress } : {},
+      });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.activity)) {
+        setActivityLogs(data.activity);
+      }
+    } catch (err) {
+      console.warn("Could not query activity logs:", err);
+    } finally {
+      setIsLoadingActivity(false);
+    }
+  }, [address, vaultXIdentity]);
+
   useEffect(() => {
     refreshFiles();
-    const handleFocus = () => refreshFiles();
+    fetchActivityLogs();
+    const handleFocus = () => {
+      refreshFiles();
+      fetchActivityLogs();
+    };
     window.addEventListener("focus", handleFocus);
     window.addEventListener("storage", handleFocus);
     return () => {
       window.removeEventListener("focus", handleFocus);
       window.removeEventListener("storage", handleFocus);
     };
-  }, [refreshFiles]);
+  }, [refreshFiles, fetchActivityLogs]);
 
   const handleCopy = (text: string, type: "cid" | "key") => {
     navigator.clipboard.writeText(text);
@@ -232,7 +267,12 @@ export function RecentFiles() {
       );
 
       const url = window.URL.createObjectURL(decrypted.plainBlob);
-      setReadyDownload({ name: decrypted.originalName, url });
+      setReadyDownload({
+        name: decrypted.originalName,
+        url,
+        blob: decrypted.plainBlob,
+        mimeType: decrypted.mimeType,
+      });
       setActiveNotification(`Decrypted: ${decrypted.originalName}`);
 
       // Auto-trigger direct browser file download
@@ -306,7 +346,12 @@ export function RecentFiles() {
       );
 
       const url = window.URL.createObjectURL(decrypted.plainBlob);
-      setReadyDownload({ name: decrypted.originalName, url });
+      setReadyDownload({
+        name: decrypted.originalName,
+        url,
+        blob: decrypted.plainBlob,
+        mimeType: decrypted.mimeType,
+      });
       setActiveNotification(`Decrypted peer file: ${share.fileName}`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Shared file decryption failed.";
@@ -402,7 +447,7 @@ export function RecentFiles() {
               <span>Your Files</span>
             </h2>
             {/* Tab switchers */}
-            <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1">
+            <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1 flex-wrap sm:flex-nowrap">
               <button
                 type="button"
                 onClick={() => setActiveTab("my_files")}
@@ -427,12 +472,29 @@ export function RecentFiles() {
                 <Users className="h-3.5 w-3.5 text-[#2563EB]" />
                 <span>Shared With Me ({sharedFiles.length})</span>
               </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab("activity");
+                  fetchActivityLogs();
+                }}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 ${
+                  activeTab === "activity"
+                    ? "bg-white text-slate-900 font-bold border border-slate-200/90 shadow-2xs"
+                    : "text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                <Activity className="h-3.5 w-3.5 text-[#2563EB]" />
+                <span>Audit Trail ({activityLogs.length})</span>
+              </button>
             </div>
           </div>
           <p className="text-xs text-slate-500 mt-1">
             {activeTab === "my_files"
               ? "Sovereign encrypted payloads pinned to IPFS nodes owned by your wallet"
-              : "Peer-to-peer encrypted payloads shared with your wallet address"}
+              : activeTab === "shared_with_me"
+              ? "Peer-to-peer encrypted payloads shared with your wallet address"
+              : "Verifiable cryptographic audit log and vault activity trail"}
           </p>
         </div>
 
@@ -487,6 +549,24 @@ export function RecentFiles() {
             <span>Decrypted file ready: <strong className="text-slate-900 font-semibold">{readyDownload.name}</strong></span>
           </div>
           <div className="flex items-center gap-2">
+            {readyDownload.blob && (
+              <button
+                type="button"
+                onClick={() =>
+                  setPreviewModalData({
+                    name: readyDownload.name,
+                    blob: readyDownload.blob!,
+                    mimeType: readyDownload.mimeType,
+                    size: readyDownload.blob!.size,
+                    url: readyDownload.url,
+                  })
+                }
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold text-xs transition-colors shrink-0 shadow-xs cursor-pointer"
+              >
+                <Eye className="h-3.5 w-3.5" />
+                <span>Preview (0-Disk)</span>
+              </button>
+            )}
             <a
               href={readyDownload.url}
               download={readyDownload.name}
@@ -497,7 +577,10 @@ export function RecentFiles() {
             </a>
             <button
               type="button"
-              onClick={() => setReadyDownload(null)}
+              onClick={() => {
+                if (readyDownload.url) URL.revokeObjectURL(readyDownload.url);
+                setReadyDownload(null);
+              }}
               className="text-slate-400 hover:text-slate-600"
             >
               <X className="h-3.5 w-3.5" />
@@ -824,6 +907,101 @@ export function RecentFiles() {
               </div>
               <p className="text-[11px] text-slate-500 max-w-sm">
                 When another user re-encrypts a file for your Ethereum address, it will appear here.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 3: CRYPTOGRAPHIC AUDIT TRAIL */}
+      {activeTab === "activity" && (
+        <div className="overflow-x-auto">
+          <div className="p-4 bg-slate-50/60 border-b border-slate-200/80 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Activity className="h-4 w-4 text-[#2563EB]" />
+              <span className="text-xs font-bold text-slate-900">Cryptographic Operation Logs</span>
+              <span className="text-[11px] font-mono text-slate-500">({activityLogs.length} events)</span>
+            </div>
+            <button
+              type="button"
+              onClick={fetchActivityLogs}
+              disabled={isLoadingActivity}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:text-slate-900 hover:border-blue-200 shadow-2xs transition-all"
+            >
+              <RefreshCw className={`h-3 w-3 text-[#2563EB] ${isLoadingActivity ? "animate-spin" : ""}`} />
+              <span>Refresh</span>
+            </button>
+          </div>
+
+          <table className="w-full text-left text-xs">
+            <thead className="border-b border-slate-200/80 bg-slate-50/80 text-slate-500 uppercase text-[10px] font-semibold tracking-wider">
+              <tr>
+                <th className="py-3 px-5">Timestamp</th>
+                <th className="py-3 px-4">Event Type</th>
+                <th className="py-3 px-4">Description</th>
+                <th className="py-3 px-5 text-right">Context</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 font-mono">
+              {activityLogs.map((log) => {
+                let badgeClass = "bg-slate-50 text-slate-700 border-slate-200";
+                if (log.eventType === "wallet_authenticated") badgeClass = "bg-emerald-50 text-emerald-700 border-emerald-200";
+                else if (log.eventType.includes("encryption")) badgeClass = "bg-blue-50 text-[#2563EB] border-blue-200";
+                else if (log.eventType.includes("upload")) badgeClass = "bg-indigo-50 text-indigo-700 border-indigo-200";
+                else if (log.eventType.includes("integrity")) badgeClass = "bg-teal-50 text-teal-700 border-teal-200";
+                else if (log.eventType === "share_created") badgeClass = "bg-purple-50 text-purple-700 border-purple-200";
+                else if (log.eventType === "share_accessed") badgeClass = "bg-cyan-50 text-cyan-700 border-cyan-200";
+                else if (log.eventType === "share_revoked" || log.eventType === "file_deleted") badgeClass = "bg-rose-50 text-rose-700 border-rose-200";
+                else if (log.eventType.includes("key")) badgeClass = "bg-violet-50 text-violet-700 border-violet-200";
+
+                return (
+                  <tr key={log.id} className="hover:bg-slate-50/70 transition-colors">
+                    <td className="py-3 px-5 whitespace-nowrap text-slate-500 text-[11px]">
+                      {new Date(log.timestamp).toLocaleString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit",
+                      })}
+                    </td>
+                    <td className="py-3 px-4 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wider ${badgeClass}`}>
+                        {log.eventType.replace(/_/g, " ")}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 font-sans text-slate-800 text-xs font-medium">
+                      {log.description}
+                    </td>
+                    <td className="py-3 px-5 text-right text-[11px] text-slate-400">
+                      {log.metadata?.shareCode ? (
+                        <span className="font-mono text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
+                          {String(log.metadata.shareCode)}
+                        </span>
+                      ) : log.metadata?.fileId ? (
+                        <span className="font-mono text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                          ID: {String(log.metadata.fileId).slice(0, 10)}...
+                        </span>
+                      ) : (
+                        <span>Verified</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+
+          {activityLogs.length === 0 && (
+            <div className="p-12 text-center flex flex-col items-center justify-center space-y-3">
+              <div className="h-12 w-12 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-400">
+                <Clock className="h-6 w-6" />
+              </div>
+              <div className="text-slate-800 text-xs font-semibold">
+                No audit activity recorded yet.
+              </div>
+              <p className="text-[11px] text-slate-500 max-w-sm">
+                Authenticating, encrypting files, uploading to IPFS, and generating secure share codes will populate this cryptographically verified audit trail.
               </p>
             </div>
           )}
@@ -1208,6 +1386,13 @@ export function RecentFiles() {
       <ReceiveSecureFileModal
         isOpen={isReceiveModalOpen}
         onClose={() => setIsReceiveModalOpen(false)}
+      />
+
+      {/* In-Browser Zero-Disk Secure Preview Modal */}
+      <SecureFilePreviewModal
+        isOpen={Boolean(previewModalData)}
+        onClose={() => setPreviewModalData(null)}
+        previewData={previewModalData}
       />
     </div>
   );

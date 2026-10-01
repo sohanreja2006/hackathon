@@ -16,7 +16,7 @@ export function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const activeAddress = address || (isVxConnected ? identity?.id : undefined);
+  const activeAddress = (isVxConnected && identity?.id) ? identity.id : address;
 
   const handleCopy = () => {
     if (!activeAddress) return;
@@ -72,7 +72,7 @@ export function Navbar() {
         {/* Right Actions */}
         <div className="hidden sm:flex items-center gap-3">
           {/* If Connected & Authenticated: Show pills like Screen 4 */}
-          {(isConnected || isVxConnected) && activeAddress ? (
+          {((isVxConnected && !!identity) || isConnected) && activeAddress ? (
             <div className="flex items-center gap-2">
               {/* Address Pill */}
               <button
@@ -81,7 +81,7 @@ export function Navbar() {
                 className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-mono font-medium text-slate-700 hover:bg-slate-100 transition-colors"
                 title="Click to copy address"
               >
-                <span className="text-sm">🦉</span>
+                <span className="text-sm">{isVxConnected ? "🔒" : "🦊"}</span>
                 <span>{formatAddress(activeAddress, 5)}</span>
                 {copied ? <Check className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3 text-slate-400" />}
               </button>
@@ -89,7 +89,7 @@ export function Navbar() {
               {/* Network Pill */}
               <div className="inline-flex items-center gap-1 rounded-full border border-purple-200 bg-purple-50 px-2.5 py-1 text-xs font-medium text-purple-700">
                 <span className="h-1.5 w-1.5 rounded-full bg-purple-500" />
-                <span>{chainName || "Sepolia"}</span>
+                <span>{isVxConnected ? "Local Vault" : (chainName || "Sepolia")}</span>
               </div>
 
               {/* Authenticated Pill */}

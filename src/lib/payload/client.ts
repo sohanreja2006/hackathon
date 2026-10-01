@@ -123,6 +123,8 @@ export const payloadService = {
     expiresAt: string | null;
     maxDownloads?: number | null;
     oneTime?: boolean;
+    burnAfterReading?: boolean;
+    burnDurationSeconds?: number;
     passwordProtected?: boolean;
     passwordHash?: string;
   }) {
@@ -141,12 +143,24 @@ export const payloadService = {
     return payloadStore.accessShare(shareCode, accessorWallet, passwordInput);
   },
 
+  burnShare(identifier: string) {
+    return payloadStore.burnShare(identifier);
+  },
+
   revokeShare(shareId: string, ownerWallet: string) {
-    return payloadStore.revokeShare(shareId, ownerWallet);
+    const result = payloadStore.revokeShare(shareId, ownerWallet);
+    if (result) {
+      payloadStore.appendActivityLog(ownerWallet, "share_revoked", `Share revoked`, { shareId });
+    }
+    return result;
   },
 
   registerUserPublicKey(walletAddress: string, publicKeyHex: string, fingerprint: string) {
-    return payloadStore.registerUserPublicKey(walletAddress, publicKeyHex, fingerprint);
+    const result = payloadStore.registerUserPublicKey(walletAddress, publicKeyHex, fingerprint);
+    payloadStore.appendActivityLog(walletAddress, "key_registered", "Encryption identity registered", {
+      fingerprint,
+    });
+    return result;
   },
 
   getUser(walletAddress: string) {
@@ -156,5 +170,17 @@ export const payloadService = {
   listUsers() {
     return payloadStore.listRegisteredUsers();
   },
-};
 
+  appendActivity(
+    walletAddress: string,
+    eventType: import("@/payload/types").ActivityEventType,
+    description: string,
+    metadata?: Record<string, string | number | boolean | null>
+  ) {
+    return payloadStore.appendActivityLog(walletAddress, eventType, description, metadata);
+  },
+
+  getActivity(walletAddress: string, limit = 50) {
+    return payloadStore.getActivityLog(walletAddress, limit);
+  },
+};

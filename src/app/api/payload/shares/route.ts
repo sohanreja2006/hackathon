@@ -65,6 +65,8 @@ export async function POST(req: NextRequest) {
       expirationOption = "24h",
       downloadLimitOption = "unlimited",
       oneTime = false,
+      burnAfterReading = false,
+      burnDurationSeconds = 60,
       passwordProtected = false,
       password = "",
     } = body;
@@ -108,6 +110,8 @@ export async function POST(req: NextRequest) {
       expiresAt,
       maxDownloads,
       oneTime: Boolean(oneTime),
+      burnAfterReading: Boolean(burnAfterReading),
+      burnDurationSeconds: Number(burnDurationSeconds) || 60,
       passwordProtected: Boolean(passwordProtected && passwordHash),
       passwordHash,
     });
@@ -117,6 +121,22 @@ export async function POST(req: NextRequest) {
         { success: false, error: "Failed to generate share code." },
         { status: 500 }
       );
+    }
+
+    try {
+      payloadService.appendActivity(
+        auth.walletAddress,
+        "share_created",
+        `Created secure share ${newShare.shareCode} for ${fileName || resolvedFileId}`,
+        {
+          shareCode: newShare.shareCode,
+          fileId: resolvedFileId,
+          recipient: recipientUserId || "public",
+          expiresAt: expiresAt || "never",
+        }
+      );
+    } catch {
+      // Non-fatal
     }
 
     return NextResponse.json({ success: true, share: newShare }, { status: 201 });

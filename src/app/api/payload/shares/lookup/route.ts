@@ -84,6 +84,7 @@ export async function GET(req: NextRequest) {
     // Sanitized share information for recipient (NO raw keys or envelopes exposed)
     const sanitized = {
       shareCode: share.shareCode,
+      fileId: share.fileId,
       fileName: share.fileName,
       fileSize: share.fileSize,
       mimeType: share.mimeType,
@@ -94,6 +95,8 @@ export async function GET(req: NextRequest) {
       downloadCount: share.downloadCount,
       maxDownloads: share.maxDownloads,
       oneTime: share.oneTime,
+      burnAfterReading: share.burnAfterReading,
+      burnDurationSeconds: share.burnDurationSeconds,
       recipientUserId: share.recipientUserId,
       recipientPublicKeyFingerprint: share.recipientPublicKeyFingerprint,
       isQuickShare: share.isQuickShare,

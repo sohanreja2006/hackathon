@@ -37,10 +37,17 @@ export function generateShareCode(): string {
 
 /**
  * Normalizes and automatically formats raw user input into SV-XXXX-XXXX-XXXX
+ * or preserves shr_ IDs.
  */
 export function formatShareCodeInput(raw: string): string {
+  if (!raw) return "";
+  const trimmed = raw.trim();
+  if (trimmed.startsWith("shr_") || trimmed.startsWith("file_")) {
+    return trimmed;
+  }
+
   // Remove everything except alphanumeric
-  let cleaned = raw.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  let cleaned = trimmed.toUpperCase().replace(/[^A-Z0-9]/g, "");
 
   // If user pasted something starting with "SV", strip the prefix first to avoid duplicate
   if (cleaned.startsWith("SV")) {
@@ -66,12 +73,15 @@ export function formatShareCodeInput(raw: string): string {
 }
 
 /**
- * Validates whether a share code matches the SV-XXXX-XXXX-XXXX structure
+ * Validates whether a share code matches the SV-XXXX-XXXX-XXXX structure or shr_ ID
  */
 export function isValidShareCodeFormat(code: string): boolean {
   if (!code) return false;
-  const trimmed = code.trim().toUpperCase();
-  return /^SV-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(trimmed);
+  const trimmed = code.trim();
+  if (trimmed.startsWith("shr_") || trimmed.startsWith("file_")) {
+    return trimmed.length >= 8;
+  }
+  return /^SV-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/i.test(trimmed);
 }
 
 /**

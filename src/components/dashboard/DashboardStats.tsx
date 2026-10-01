@@ -10,17 +10,23 @@ import { formatBytes } from "@/lib/crypto";
 
 export function DashboardStats() {
   const { address } = useAccount();
-  const { identity: vaultXIdentity } = useVaultXWallet();
+  const { isConnected: isVaultXConnected, identity: vaultXIdentity } = useVaultXWallet();
 
   const [totalFiles, setTotalFiles] = useState(0);
   const [totalBytes, setTotalBytes] = useState(0);
+  const [activeUploads, setActiveUploads] = useState(0);
 
   useEffect(() => {
     const updateStats = () => {
-      const files = getAllVaultFiles([address, vaultXIdentity?.id]);
+      const activeOwner = (isVaultXConnected && vaultXIdentity?.id) ? vaultXIdentity.id : address;
+      const files = getAllVaultFiles([activeOwner]);
       setTotalFiles(files.length);
       const bytes = files.reduce((acc, f) => acc + (f.fileSize || 0), 0);
       setTotalBytes(bytes);
+      const active = files.filter(
+        (f) => f.uploadStatus === "uploading" || f.uploadStatus === "pending"
+      ).length;
+      setActiveUploads(active);
     };
 
     updateStats();
@@ -30,7 +36,7 @@ export function DashboardStats() {
       window.removeEventListener("focus", updateStats);
       window.removeEventListener("storage", updateStats);
     };
-  }, [address, vaultXIdentity]);
+  }, [address, isVaultXConnected, vaultXIdentity]);
 
   return (
     <div className="stat-cards-grid grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -53,7 +59,7 @@ export function DashboardStats() {
       {/* 3. Active Uploads */}
       <StatCard
         title="Active Uploads"
-        value={0}
+        value={activeUploads}
         icon={ArrowUpCircle}
         iconColor="text-[#2563EB]"
       />

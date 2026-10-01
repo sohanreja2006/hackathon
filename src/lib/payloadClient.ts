@@ -233,6 +233,8 @@ export interface CreateSecureShareParams {
   expirationOption?: "never" | "1h" | "24h" | "7d" | "30d";
   downloadLimitOption?: "1" | "5" | "10" | "unlimited";
   oneTime?: boolean;
+  burnAfterReading?: boolean;
+  burnDurationSeconds?: number;
   passwordProtected?: boolean;
   password?: string;
 }
@@ -255,6 +257,20 @@ export async function createSecureShare(
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Failed to create secure share.";
     throw new Error(msg);
+  }
+}
+
+export async function burnSecureShareApi(shareCodeOrId: string): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/shares/${encodeURIComponent(shareCodeOrId)}/burn`, {
+      method: "POST",
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    return Boolean(data.success);
+  } catch (err) {
+    console.error("burnSecureShareApi error:", err);
+    return false;
   }
 }
 

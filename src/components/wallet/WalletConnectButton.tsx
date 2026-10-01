@@ -99,7 +99,28 @@ export function WalletConnectButton({
         return (
           <>
             <div className={cn("inline-flex items-center gap-2 flex-wrap", className)}>
-              {metaMaskConnected && account ? (
+              {isVaultXConnected && identity ? (
+                /* Secure Key Wallet / Local Wallet Pill - Takes priority when connected */
+                <button
+                  onClick={() => setModalOpen(true)}
+                  type="button"
+                  className={cn(
+                    "inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 text-blue-800 shadow-2xs",
+                    "hover:bg-blue-100 transition-all active:scale-[0.98]",
+                    size === "sm" && "h-8 px-3 text-xs",
+                    size === "default" && "h-10 px-4 text-sm",
+                    size === "lg" && "h-12 px-5 text-base"
+                  )}
+                >
+                  <Lock className="h-3.5 w-3.5 text-blue-600" />
+                  <span className="font-mono font-semibold tracking-tight text-blue-900">
+                    {identity.id}
+                  </span>
+                  <span className="hidden sm:inline-flex items-center rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-[10px] font-semibold">
+                    Local Wallet
+                  </span>
+                </button>
+              ) : metaMaskConnected && account ? (
                 <>
                   {/* Chain Selector Pill */}
                   {showNetworkBadge && chain && (
@@ -148,27 +169,6 @@ export function WalletConnectButton({
                     <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
                   </button>
                 </>
-              ) : isVaultXConnected && identity ? (
-                /* Secure Key Wallet Pill */
-                <button
-                  onClick={() => setModalOpen(true)}
-                  type="button"
-                  className={cn(
-                    "inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 text-blue-800 shadow-2xs",
-                    "hover:bg-blue-100 transition-all active:scale-[0.98]",
-                    size === "sm" && "h-8 px-3 text-xs",
-                    size === "default" && "h-10 px-4 text-sm",
-                    size === "lg" && "h-12 px-5 text-base"
-                  )}
-                >
-                  <Lock className="h-3.5 w-3.5 text-blue-600" />
-                  <span className="font-mono font-semibold tracking-tight text-blue-900">
-                    {identity.id}
-                  </span>
-                  <span className="hidden sm:inline-flex items-center rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-[10px] font-semibold">
-                    Protected
-                  </span>
-                </button>
               ) : (
                 <button
                   onClick={() => setModalOpen(true)}

@@ -61,6 +61,21 @@ export async function POST(req: NextRequest) {
     chunkSize: Number(chunkSize) || 8388608,
   });
 
+  try {
+    payloadService.appendActivity(
+      auth.walletAddress,
+      "upload_started",
+      `Initiated chunked upload for ${originalName} (${totalChunks || 1} chunks)`,
+      {
+        fileId: file.id,
+        size,
+        totalChunks: file.totalChunks,
+      }
+    );
+  } catch {
+    // Non-fatal
+  }
+
   return NextResponse.json({
     success: true,
     doc: file,

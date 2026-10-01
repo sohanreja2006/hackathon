@@ -6,11 +6,14 @@ import {
   PayloadChunk,
   PayloadManifest,
   PayloadShare,
+  PayloadActivityLog,
+  ActivityEventType,
   ShareStatus,
   FileUploadStatus,
   FileIntegrityStatus,
 } from "@/payload/types";
 import { generateShareCode, hashSharePassword } from "@/lib/shareCode";
+import { recordActivityLog } from "./db";
 
 interface PayloadDatabaseData {
   users: Record<string, PayloadUser>;
@@ -18,6 +21,7 @@ interface PayloadDatabaseData {
   chunks: Record<string, PayloadChunk>;
   manifests: Record<string, PayloadManifest>;
   shares: Record<string, PayloadShare>;
+  activity: PayloadActivityLog[];
 }
 
 // In-memory cache for fast operations
@@ -27,16 +31,16 @@ let memoryDb: PayloadDatabaseData = {
   chunks: {},
   manifests: {},
   shares: {},
+  activity: [],
 };
 
 let isLoaded = false;
+let lastMtimeMs = 0;
 
 // Resolve persistence file path safely
 function getStoreFilePath(): string {
-  // Use .payload-store.json in project root, or /tmp if read-only
   try {
     const primaryPath = path.join(process.cwd(), ".payload-store.json");
-    // Test write accessibility
     if (fs.existsSync(primaryPath)) {
       return primaryPath;
     }
@@ -48,10 +52,13 @@ function getStoreFilePath(): string {
 }
 
 function loadStore(): void {
-  if (isLoaded) return;
   try {
     const filePath = getStoreFilePath();
     if (fs.existsSync(filePath)) {
+      const stat = fs.statSync(filePath);
+      if (isLoaded && stat.mtimeMs <= lastMtimeMs) {
+        return;
+      }
       const raw = fs.readFileSync(filePath, "utf-8");
       if (raw.trim()) {
         const parsed = JSON.parse(raw);
@@ -61,8 +68,10 @@ function loadStore(): void {
           chunks: parsed.chunks || {},
           manifests: parsed.manifests || {},
           shares: parsed.shares || {},
+          activity: parsed.activity || [],
         };
       }
+      lastMtimeMs = stat.mtimeMs;
     }
   } catch (err) {
     console.warn("Payload store: error loading local storage, using memory:", err);
@@ -74,6 +83,11 @@ function saveStore(): void {
   try {
     const filePath = getStoreFilePath();
     fs.writeFileSync(filePath, JSON.stringify(memoryDb, null, 2), "utf-8");
+    try {
+      lastMtimeMs = fs.statSync(filePath).mtimeMs;
+    } catch {
+      lastMtimeMs = Date.now();
+    }
   } catch (err) {
     console.warn("Payload store: unable to persist to disk (serverless environment):", err);
   }
@@ -317,6 +331,8 @@ export const payloadStore = {
     expiresAt: string | null;
     maxDownloads?: number | null;
     oneTime?: boolean;
+    burnAfterReading?: boolean;
+    burnDurationSeconds?: number;
     passwordProtected?: boolean;
     passwordHash?: string;
   }): PayloadShare | null {
@@ -380,6 +396,8 @@ export const payloadStore = {
       maxDownloads: data.maxDownloads !== undefined ? data.maxDownloads : null,
       downloadCount: 0,
       oneTime: Boolean(data.oneTime),
+      burnAfterReading: Boolean(data.burnAfterReading),
+      burnDurationSeconds: data.burnDurationSeconds !== undefined ? Number(data.burnDurationSeconds) : 60,
       passwordProtected: Boolean(data.passwordProtected),
       passwordHash: data.passwordHash,
       status: "active",
@@ -572,5 +590,112 @@ export const payloadStore = {
     share.status = "revoked";
     saveStore();
     return true;
+  },
+
+  burnShare(identifier: string): { success: boolean; error?: string } {
+    loadStore();
+    const normalized = identifier.trim().toUpperCase();
+    const share = Object.values(memoryDb.shares).find(
+      (s) => s.id === identifier || s.shareCode.toUpperCase() === normalized
+    );
+
+    if (!share) {
+      return { success: false, error: "Share not found." };
+    }
+
+    share.status = "revoked";
+    share.lastAccessedAt = new Date().toISOString();
+    // Cryptographically purge envelopes on server
+    share.encryptedFileKey = "";
+    share.quickShareEnvelope = undefined;
+    saveStore();
+
+    try {
+      this.appendActivityLog(
+        share.ownerWallet,
+        "share_burned",
+        `Share ${share.shareCode} self-destructed upon completion of reading`,
+        { shareCode: share.shareCode, fileId: share.fileId }
+      );
+    } catch {
+      // Non-fatal
+    }
+
+    return { success: true };
+  },
+
+  // ── ACTIVITY LOG ──────────────────────────────────────────────────────
+  appendActivityLog(
+    walletAddress: string,
+    eventType: ActivityEventType,
+    description: string,
+    metadata?: Record<string, string | number | boolean | null>
+  ): PayloadActivityLog {
+    loadStore();
+    const entry: PayloadActivityLog = {
+      id: `act_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      walletAddress: walletAddress.toLowerCase(),
+      eventType,
+      description,
+      metadata,
+      timestamp: new Date().toISOString(),
+    };
+    // Keep at most 500 entries per store to avoid unbounded growth
+    memoryDb.activity.push(entry);
+    if (memoryDb.activity.length > 500) {
+      memoryDb.activity = memoryDb.activity.slice(-500);
+    }
+    saveStore();
+
+    recordActivityLog({
+      userWallet: walletAddress,
+      action: eventType,
+      metadata: metadata || undefined,
+    }).catch(() => {});
+
+    return entry;
+  },
+
+  getActivityLog(
+    walletAddress: string,
+    limit = 50
+  ): PayloadActivityLog[] {
+    loadStore();
+    const normalized = walletAddress.toLowerCase();
+    return memoryDb.activity
+      .filter((e) => e.walletAddress === normalized)
+      .slice(-limit)
+      .reverse();
+  },
+
+  appendActivity(
+    walletAddress: string,
+    eventType: ActivityEventType | string,
+    description: string,
+    metadata?: Record<string, unknown>
+  ): PayloadActivityLog {
+    return this.appendActivityLog(
+      walletAddress,
+      eventType as ActivityEventType,
+      description,
+      metadata as Record<string, string | number | boolean | null>
+    );
+  },
+
+  getShareById(shareId: string): PayloadShare | null {
+    loadStore();
+    return memoryDb.shares[shareId] || null;
+  },
+
+  getSharesByOwner(ownerWallet: string): PayloadShare[] {
+    loadStore();
+    const normalized = ownerWallet.toLowerCase();
+    return Object.values(memoryDb.shares)
+      .filter((s) => s.ownerWallet.toLowerCase() === normalized)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  },
+
+  getUser(walletAddress: string): PayloadUser | null {
+    return this.getUserByWallet(walletAddress);
   },
 };

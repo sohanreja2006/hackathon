@@ -13,6 +13,7 @@ export * from "@/components/dashboard/RecentFiles";
 export * from "@/components/dashboard/FileDetailsModal";
 export * from "@/components/dashboard/CreateSecureShareModal";
 export * from "@/components/dashboard/ReceiveSecureFileModal";
+export * from "@/components/dashboard/SecureFilePreviewModal";
 export * from "@/components/encryption/FileEncryptionPanel";
 export * from "@/components/vault/VaultTabs";
 export * from "@/components/vault/VaultUploadPanel";

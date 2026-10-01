@@ -80,6 +80,29 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
     );
   }
 
+  try {
+    if (filteredUpdates.uploadStatus === "completed") {
+      payloadService.appendActivity(
+        auth.walletAddress,
+        "upload_completed",
+        `Completed upload for ${updated.originalName}`,
+        {
+          fileId: id,
+          manifestCID: updated.manifestCID || null,
+        }
+      );
+    } else if (filteredUpdates.integrityStatus === "verified") {
+      payloadService.appendActivity(
+        auth.walletAddress,
+        "integrity_verified",
+        `SHA-256 integrity verified for ${updated.originalName}`,
+        { fileId: id }
+      );
+    }
+  } catch {
+    // Non-fatal
+  }
+
   return NextResponse.json({
     success: true,
     doc: updated,
@@ -100,12 +123,24 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
   }
 
   const { id } = await params;
+  const existing = payloadService.getFile(id, auth.walletAddress);
   const deleted = payloadService.deleteFile(id, auth.walletAddress);
   if (!deleted) {
     return NextResponse.json(
       { success: false, error: "File not found or access denied." },
       { status: 404 }
     );
+  }
+
+  try {
+    payloadService.appendActivity(
+      auth.walletAddress,
+      "file_deleted",
+      `Removed file ${existing?.originalName || id} from vault registry`,
+      { fileId: id }
+    );
+  } catch {
+    // Non-fatal
   }
 
   return NextResponse.json({ success: true, message: "File removed from registry." });

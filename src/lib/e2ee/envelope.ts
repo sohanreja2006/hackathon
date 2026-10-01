@@ -99,12 +99,14 @@ export async function createKeyEnvelope(
  */
 export async function unwrapKeyEnvelope(
   encryptedFileKeyHex: string,
-  metadata: KeyAgreementMetadata,
+  metadata: KeyAgreementMetadata | string,
   recipientPrivateKeyHex: string
 ): Promise<string> {
+  const meta: KeyAgreementMetadata =
+    typeof metadata === "string" ? JSON.parse(metadata) : metadata;
   const recipientPrivBytes = hexToBytes(recipientPrivateKeyHex);
-  const ephemeralPubBytes = hexToBytes(metadata.ephemeralPublicKey);
-  const ivBytes = hexToBytes(metadata.iv);
+  const ephemeralPubBytes = hexToBytes(meta.ephemeralPublicKey);
+  const ivBytes = hexToBytes(meta.iv);
   const ciphertextBytes = hexToBytes(encryptedFileKeyHex);
 
   // 1. Recover shared secret
@@ -171,12 +173,14 @@ export async function createQuickShareEnvelope(
  * Recipient unwraps a Quick Share envelope using the high-entropy secret extracted from URL hash.
  */
 export async function unwrapQuickShareEnvelope(
-  envelope: QuickShareEnvelope,
+  envelope: QuickShareEnvelope | string,
   secretHex: string
 ): Promise<string> {
+  const env: QuickShareEnvelope =
+    typeof envelope === "string" ? JSON.parse(envelope) : envelope;
   const secretBytes = hexToBytes(secretHex);
-  const ivBytes = hexToBytes(envelope.iv);
-  const ciphertextBytes = hexToBytes(envelope.encryptedFileKey);
+  const ivBytes = hexToBytes(env.iv);
+  const ciphertextBytes = hexToBytes(env.encryptedFileKey);
 
   const cryptoKey = await crypto.subtle.importKey(
     "raw",

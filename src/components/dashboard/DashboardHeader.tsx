@@ -9,7 +9,7 @@ export function DashboardHeader() {
   const { address } = useAuthStatus();
   const { isConnected: isVaultXConnected, identity } = useVaultXWallet();
 
-  const activeAddress = address || (isVaultXConnected ? identity?.id : undefined);
+  const activeAddress = (isVaultXConnected && identity?.id) ? identity.id : address;
 
   return (
     <div className="relative overflow-hidden rounded-3xl border border-slate-200/90 bg-gradient-to-r from-white via-blue-50/20 to-white p-6 sm:p-8 mb-8 shadow-xs">

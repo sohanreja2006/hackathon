@@ -93,9 +93,37 @@ export async function POST(req: NextRequest) {
 
     const { share, manifest, chunks } = result;
 
+    try {
+      payloadService.appendActivity(
+        share.ownerWallet,
+        "share_accessed",
+        `Share ${normalizedCode} accessed by ${accessorWallet || "authorized recipient"}`,
+        {
+          shareCode: normalizedCode,
+          accessorWallet: accessorWallet || null,
+          fileName: share.fileName,
+        }
+      );
+      if (accessorWallet && accessorWallet.toLowerCase() !== share.ownerWallet.toLowerCase()) {
+        payloadService.appendActivity(
+          accessorWallet,
+          "share_accessed",
+          `Retrieved and unwrapped share ${normalizedCode} (${share.fileName || "secure file"})`,
+          {
+            shareCode: normalizedCode,
+            ownerWallet: share.ownerWallet,
+          }
+        );
+      }
+    } catch {
+      // Non-fatal
+    }
+
     return NextResponse.json({
       success: true,
       file: {
+        fileId: share.fileId,
+        id: share.fileId,
         fileName: share.fileName,
         fileSize: share.fileSize,
         mimeType: share.mimeType,

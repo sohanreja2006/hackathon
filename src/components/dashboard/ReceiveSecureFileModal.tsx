@@ -17,11 +17,14 @@ import {
   KeyRound,
   UserCheck,
   AlertTriangle,
+  Flame,
+  Eye,
 } from "lucide-react";
-import { formatBytes, downloadAndDecryptFromIpfs } from "@/lib/crypto";
+import { formatBytes, downloadBlob } from "@/lib/crypto";
+import { computeSha256, verifyAndDecryptChunk } from "@/lib/crypto/chunkedEngine";
 import { OwlCompanion, OwlState } from "@/components/ui/OwlCompanion";
 import { formatShareCodeInput, isValidShareCodeFormat } from "@/lib/shareCode";
-import { lookupSecureShare, accessSecureShare } from "@/lib/payloadClient";
+import { lookupSecureShare, accessSecureShare, burnSecureShareApi } from "@/lib/payloadClient";
 import { getIpfsUrl, fetchFromIpfs } from "@/lib/ipfs/gateway";
 import { getAllVaultFiles } from "@/lib/fileStorage";
 import {
@@ -30,6 +33,8 @@ import {
   unwrapQuickShareEnvelope,
 } from "@/lib/e2ee";
 import { SecurityVerificationModal } from "./SecurityVerificationModal";
+import { SecureFilePreviewModal, SecurePreviewData } from "./SecureFilePreviewModal";
+import { useVaultXWallet } from "@/context/VaultXWalletContext";
 
 interface ReceiveSecureFileModalProps {
   isOpen: boolean;
@@ -43,6 +48,9 @@ export function ReceiveSecureFileModal({
   initialCode = "",
 }: ReceiveSecureFileModalProps) {
   const { address, isConnected } = useAccount();
+  const { identity: vaultXIdentity, isConnected: isVaultXConnected } = useVaultXWallet();
+  const activeAddress = (isVaultXConnected && vaultXIdentity?.id) ? vaultXIdentity.id : address;
+  const activeConnected = (isVaultXConnected && !!vaultXIdentity) || (isConnected && !!address);
 
   // Input code state
   const [shareCode, setShareCode] = useState(initialCode ? formatShareCodeInput(initialCode) : "");
@@ -64,6 +72,8 @@ export function ReceiveSecureFileModal({
     recipientPublicKeyFingerprint?: string | null;
     isQuickShare?: boolean;
     hasEncryptedKey?: boolean;
+    burnAfterReading?: boolean;
+    burnDurationSeconds?: number;
   } | null>(null);
 
   // Quick share secret if applicable
@@ -77,6 +87,16 @@ export function ReceiveSecureFileModal({
   // Security Verification Modal
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
 
+  // In-Browser Preview & Decrypted Blob State
+  const [decryptedBlob, setDecryptedBlob] = useState<Blob | null>(null);
+  const [previewData, setPreviewData] = useState<SecurePreviewData | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
+  // Self-Destruct / Burn-on-Read State
+  const [burnRemainingSeconds, setBurnRemainingSeconds] = useState<number | null>(null);
+  const [isBurned, setIsBurned] = useState(false);
+  const burnTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+
   // Retrieval & Decryption state
   const [isProcessing, setIsProcessing] = useState(false);
   const [progressMessage, setProgressMessage] = useState<string>("");
@@ -87,6 +107,46 @@ export function ReceiveSecureFileModal({
 
   // Dynamic Owl State
   const [owlState, setOwlState] = useState<OwlState>("idle");
+
+  // Burn-on-read timer effect
+  useEffect(() => {
+    if (burnRemainingSeconds !== null && burnRemainingSeconds > 0) {
+      burnTimerRef.current = setTimeout(() => {
+        setBurnRemainingSeconds((prev) => (prev !== null ? prev - 1 : null));
+      }, 1000);
+    } else if (burnRemainingSeconds === 0) {
+      triggerBurn();
+    }
+    return () => {
+      if (burnTimerRef.current) clearTimeout(burnTimerRef.current);
+    };
+  }, [burnRemainingSeconds]);
+
+  const triggerBurn = async () => {
+    if (foundShare) {
+      try {
+        await burnSecureShareApi(foundShare.shareCode);
+      } catch {
+        // Non-fatal
+      }
+    }
+    // Cryptographically purge volatile memory & blob
+    if (downloadReady?.url) {
+      URL.revokeObjectURL(downloadReady.url);
+    }
+    setDownloadReady(null);
+    setDecryptedBlob(null);
+    setIsPreviewOpen(false);
+    setPreviewData(null);
+    setIsBurned(true);
+    setOwlState("idle");
+  };
+
+  const formatCountdown = (secs: number) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+  };
 
   // Auto-detect Quick Share secret or key from URL hash or query param (#secret=... or ?secret=...)
   useEffect(() => {
@@ -182,8 +242,8 @@ export function ReceiveSecureFileModal({
     if (!foundShare) return false;
     if (foundShare.isQuickShare) return true;
     if (!foundShare.recipientUserId) return true;
-    if (!isConnected || !address) return false;
-    return address.toLowerCase() === foundShare.recipientUserId.toLowerCase();
+    if (!activeConnected || !activeAddress) return false;
+    return activeAddress.toLowerCase() === foundShare.recipientUserId.toLowerCase();
   };
 
   const handleStartDecryptionAndDownload = async () => {
@@ -200,13 +260,13 @@ export function ReceiveSecureFileModal({
     }
 
     if (!foundShare.isQuickShare && foundShare.recipientUserId) {
-      if (!isConnected || !address) {
+      if (!activeConnected || !activeAddress) {
         setLookupError("Please connect your recipient Web3 wallet to unlock this end-to-end encrypted file.");
         return;
       }
-      if (address.toLowerCase() !== foundShare.recipientUserId.toLowerCase()) {
+      if (activeAddress.toLowerCase() !== foundShare.recipientUserId.toLowerCase()) {
         setLookupError(
-          `Access restricted: This file is encrypted specifically for recipient ${foundShare.recipientUserId.slice(0, 6)}...${foundShare.recipientUserId.slice(-4)}. Your connected wallet (${address.slice(0, 6)}...${address.slice(-4)}) is not authorized.`
+          `Access restricted: This file is encrypted specifically for recipient ${foundShare.recipientUserId.slice(0, 6)}...${foundShare.recipientUserId.slice(-4)}. Your connected wallet (${activeAddress.slice(0, 6)}...${activeAddress.slice(-4)}) is not authorized.`
         );
         return;
       }
@@ -224,7 +284,7 @@ export function ReceiveSecureFileModal({
       // 1. Access share from server
       const accessRes = await accessSecureShare(
         foundShare.shareCode,
-        address || undefined,
+        activeAddress || undefined,
         passwordInput.trim() || undefined
       );
 
@@ -259,13 +319,13 @@ export function ReceiveSecureFileModal({
         }
       } else if (accessRes.encryptedFileKey && accessRes.keyAgreementMetadata) {
         // Direct E2EE: unwrap with recipient's device-local private X25519 key
-        if (!address) {
+        if (!activeAddress) {
           throw new Error("Connected wallet address required to retrieve local private key.");
         }
-        const localId = await getLocalEncryptionIdentity(address);
+        const localId = await getLocalEncryptionIdentity(activeAddress);
         if (!localId || !localId.privateKeyHex) {
           throw new Error(
-            `SecureVault encryption private key not found on this device for ${address.slice(0, 6)}...${address.slice(-4)}. The private key never leaves the device where your identity was created.`
+            `SecureVault encryption private key not found on this device for ${activeAddress.slice(0, 6)}...${activeAddress.slice(-4)}. The private key never leaves the device where your identity was created.`
           );
         }
 
@@ -291,84 +351,116 @@ export function ReceiveSecureFileModal({
       }
 
       // 3. Chunks & Integrity Verification
-      const totalChunks = chunks?.length || manifest?.chunks?.length || 1;
+      const targetChunks = chunks && chunks.length > 0 ? chunks : manifest?.chunks || [];
+      if (!targetChunks || targetChunks.length === 0) {
+        throw new Error("No chunk metadata found for file reconstruction.");
+      }
+
+      // Sort chunks by index strictly
+      const sortedChunks = [...targetChunks].sort(
+        (a, b) => ((a.index ?? a.chunkIndex ?? 0) - (b.index ?? b.chunkIndex ?? 0))
+      );
+
+      const totalChunks = sortedChunks.length;
       setChunkProgress({ current: 0, total: totalChunks });
       setProgressMessage(`Retrieving encrypted chunks (0 / ${totalChunks})...`);
 
-      const targetChunks = chunks && chunks.length > 0 ? chunks : manifest?.chunks || [];
+      const decryptedParts: ArrayBuffer[] = [];
       const verifiedIndices: number[] = [];
-
-      // Download and verify each chunk hash
-      if (targetChunks.length > 0) {
-        for (let i = 0; i < targetChunks.length; i++) {
-          const ch = targetChunks[i];
-          setProgressMessage(`Retrieving encrypted chunk ${i + 1} of ${totalChunks} from IPFS...`);
-          setChunkProgress({ current: i + 1, total: totalChunks });
-
-          // Fetch chunk buffer from IPFS with multi-gateway failover
-          let chunkBuffer: ArrayBuffer;
-          try {
-            chunkBuffer = await fetchFromIpfs(ch.cid);
-          } catch {
-            const gatewayUrl = getIpfsUrl(ch.cid);
-            const chunkRes = await fetch(gatewayUrl);
-            if (!chunkRes.ok) {
-              throw new Error(`Failed to fetch chunk ${i + 1} (${ch.cid}) from IPFS.`);
-            }
-            chunkBuffer = await chunkRes.arrayBuffer();
-          }
-
-          // Compute SHA-256 hash
-          const hashBuffer = await crypto.subtle.digest("SHA-256", chunkBuffer);
-          const hashArray = Array.from(new Uint8Array(hashBuffer));
-          const computedHash = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
-
-          if (ch.hash && computedHash.toLowerCase() !== ch.hash.toLowerCase()) {
-            setOwlState("error");
-            setIntegrityError(`Integrity verification failed on chunk ${i + 1}. SHA-256 checksum mismatch.`);
-            return;
-          }
-
-          verifiedIndices.push(i + 1);
-          setVerifiedChunks([...verifiedIndices]);
-        }
-      }
-
-      // 4. Decrypt payload locally using WebCrypto
-      setOwlState("decrypting");
-      setProgressMessage("All chunks verified! Decrypting locally in browser WebCrypto...");
-
-      const targetCid =
-        file.manifestCID ||
-        foundShare?.manifestCID ||
-        chunks?.[0]?.cid ||
-        manifest?.manifestCID ||
-        (file as unknown as { cid?: string })?.cid;
-      if (!targetCid) {
-        throw new Error("Missing content CID for decryption.");
-      }
-
-      const decrypted = await downloadAndDecryptFromIpfs(
-        targetCid,
-        recoveredKeyHex,
-        undefined,
-        (msg) => setProgressMessage(msg)
+      const candidateIds = Array.from(
+        new Set(
+          [
+            (file as any)?.fileId,
+            (file as any)?.id,
+            (foundShare as any)?.fileId,
+            manifest?.fileId,
+            (manifest as any)?.id,
+            foundShare?.manifestCID,
+            (file as any)?.manifestCID,
+            foundShare?.shareCode,
+            file?.fileName,
+            foundShare?.fileName,
+          ].filter((x): x is string => typeof x === "string" && x.trim().length > 0)
+        )
       );
+      const targetFileId = candidateIds[0] || "";
 
-      // 5. File reconstructed
-      const url = window.URL.createObjectURL(decrypted.plainBlob);
-      const fileName = decrypted.originalName || file.fileName;
+      for (let i = 0; i < totalChunks; i++) {
+        const ch = sortedChunks[i];
+        const chunkIdx = ch.index ?? ch.chunkIndex ?? i;
+        const expectedSha = ch.sha256 || ch.hash;
+        const iv = ch.iv;
+        const cid = ch.cid || ch.ipfsCID;
+
+        // Fetch chunk buffer from IPFS with multi-gateway failover
+        setProgressMessage(`Retrieving encrypted chunk ${i + 1} of ${totalChunks} from IPFS...`);
+        setChunkProgress({ current: i + 1, total: totalChunks });
+
+        let chunkBuffer: ArrayBuffer;
+        try {
+          chunkBuffer = await fetchFromIpfs(cid);
+        } catch {
+          const gatewayUrl = getIpfsUrl(cid);
+          const chunkRes = await fetch(gatewayUrl);
+          if (!chunkRes.ok) {
+            throw new Error(`Failed to fetch chunk ${i + 1} (${cid}) from IPFS.`);
+          }
+          chunkBuffer = await chunkRes.arrayBuffer();
+        }
+
+        // Compute and verify SHA-256 hash
+        setProgressMessage(`Verifying SHA-256 integrity for chunk ${i + 1}...`);
+        const actualHash = await computeSha256(chunkBuffer);
+        if (expectedSha && actualHash.toLowerCase() !== expectedSha.toLowerCase()) {
+          setOwlState("error");
+          setIntegrityError(
+            `Integrity verification failed for chunk ${i + 1}.\nExpected SHA-256: ${expectedSha}\nReceived: ${actualHash}\nDecryption aborted.`
+          );
+          return;
+        }
+
+        // Decrypt chunk locally using AES-256-GCM + AAD (with multi-candidate fallback)
+        setProgressMessage(`Decrypting chunk ${i + 1} with AES-256-GCM...`);
+        const plaintext = await verifyAndDecryptChunk(
+          chunkBuffer,
+          recoveredKeyHex,
+          chunkIdx,
+          actualHash,
+          iv,
+          targetFileId,
+          candidateIds
+        );
+
+        decryptedParts.push(plaintext);
+        verifiedIndices.push(i + 1);
+        setVerifiedChunks([...verifiedIndices]);
+      }
+
+      // 4. File Reconstructed
+      setOwlState("decrypting");
+      setProgressMessage("Reconstructing original file from verified chunks...");
+      const mimeType = file.mimeType || "application/octet-stream";
+      const plainBlob = new Blob(decryptedParts, { type: mimeType });
+
+      if (file.fileSize && plainBlob.size !== file.fileSize) {
+        throw new Error(
+          `Reconstructed file size mismatch: expected ${file.fileSize} bytes, got ${plainBlob.size} bytes.`
+        );
+      }
+
+      const fileName = file.fileName || foundShare.fileName || "decrypted_file";
+      const url = window.URL.createObjectURL(plainBlob);
+      setDecryptedBlob(plainBlob);
       setDownloadReady({ name: fileName, url });
       setOwlState("success");
       setProgressMessage("File reconstructed and ready for download!");
 
-      // Auto trigger download
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      if (foundShare.burnAfterReading) {
+        setBurnRemainingSeconds(foundShare.burnDurationSeconds || 60);
+      }
+
+      // 5. Trigger browser download with original filename
+      downloadBlob(plainBlob, fileName);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Retrieval failed.";
       setIntegrityError(`Decryption error: ${msg}`);
@@ -379,6 +471,10 @@ export function ReceiveSecureFileModal({
   };
 
   const handleReset = () => {
+    if (burnTimerRef.current) clearTimeout(burnTimerRef.current);
+    if (downloadReady?.url) {
+      URL.revokeObjectURL(downloadReady.url);
+    }
     setShareCode("");
     setFoundShare(null);
     setLookupError(null);
@@ -387,6 +483,11 @@ export function ReceiveSecureFileModal({
     setQuickShareSecret("");
     setSecretError(null);
     setDownloadReady(null);
+    setDecryptedBlob(null);
+    setPreviewData(null);
+    setIsPreviewOpen(false);
+    setBurnRemainingSeconds(null);
+    setIsBurned(false);
     setVerifiedChunks([]);
     setChunkProgress(null);
     setOwlState("idle");
@@ -508,6 +609,12 @@ export function ReceiveSecureFileModal({
                       ) : (
                         <span className="inline-flex items-center gap-1 text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200">
                           E2EE Asymmetric
+                        </span>
+                      )}
+                      {foundShare.burnAfterReading && (
+                        <span className="inline-flex items-center gap-1 text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-300 font-semibold">
+                          <Flame className="h-3 w-3 text-amber-600 animate-pulse" />
+                          Self-Destruct Armed ({foundShare.burnDurationSeconds || 60}s)
                         </span>
                       )}
                     </div>
@@ -637,18 +744,18 @@ export function ReceiveSecureFileModal({
                       )}
 
                       {/* Authorization Warning if connected wallet does not match */}
-                      {foundShare.recipientUserId && isConnected && address && (
+                      {foundShare.recipientUserId && activeConnected && activeAddress && (
                         <div className="pt-1">
-                          {address.toLowerCase() === foundShare.recipientUserId.toLowerCase() ? (
+                          {activeAddress.toLowerCase() === foundShare.recipientUserId.toLowerCase() ? (
                             <div className="flex items-center gap-1.5 text-[11px] text-emerald-700 font-semibold bg-emerald-50 p-2 rounded-lg border border-emerald-200">
                               <UserCheck className="h-3.5 w-3.5 shrink-0" />
-                              <span>Recipient wallet authenticated: {address.slice(0, 6)}...{address.slice(-4)}</span>
+                              <span>Recipient wallet authenticated: {activeAddress.slice(0, 6)}...{activeAddress.slice(-4)}</span>
                             </div>
                           ) : (
                             <div className="flex items-center gap-1.5 text-[11px] text-amber-800 font-medium bg-amber-50 p-2 rounded-lg border border-amber-200">
                               <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-600" />
                               <span>
-                                Connected as {address.slice(0, 6)}...{address.slice(-4)}. Switch wallet to {foundShare.recipientUserId.slice(0, 6)}...{foundShare.recipientUserId.slice(-4)} to unlock.
+                                Connected as {activeAddress.slice(0, 6)}...{activeAddress.slice(-4)}. Switch wallet to {foundShare.recipientUserId.slice(0, 6)}...{foundShare.recipientUserId.slice(-4)} to unlock.
                               </span>
                             </div>
                           )}
@@ -696,9 +803,49 @@ export function ReceiveSecureFileModal({
                 </div>
               )}
             </>
+          ) : isBurned ? (
+            /* Self-Destructed Screen */
+            <div className="space-y-4 text-center py-6 animate-in zoom-in-95 duration-200">
+              <div className="flex h-16 w-16 mx-auto items-center justify-center rounded-2xl bg-rose-50 text-rose-600 border border-rose-200 shadow-sm">
+                <Flame className="h-8 w-8 animate-pulse" />
+              </div>
+              <div className="space-y-1">
+                <div className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-700 bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200">
+                  <span>Self-Destruct Executed</span>
+                </div>
+                <h3 className="text-base font-bold text-slate-900">File Permanently Self-Destructed</h3>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
+                  The burn-after-reading countdown has expired. All wrapped key envelopes were cryptographically zeroized on the server, the share link was permanently revoked, and volatile plaintext memory was purged.
+                </p>
+              </div>
+
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 max-w-xs mx-auto text-[11px] font-mono text-slate-600 space-y-1 text-left">
+                <div className="flex justify-between">
+                  <span>Status:</span>
+                  <span className="text-rose-600 font-bold">REVOKED & ZEROIZED</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Memory:</span>
+                  <span className="text-emerald-600 font-bold">WIPED FROM RAM</span>
+                </div>
+              </div>
+            </div>
           ) : (
             /* Ready Download Success Screen */
-            <div className="space-y-5 text-center py-3 animate-in zoom-in-95 duration-200">
+            <div className="space-y-4 text-center py-2 animate-in zoom-in-95 duration-200">
+              {/* Burn Countdown Warning Banner */}
+              {burnRemainingSeconds !== null && (
+                <div className="bg-gradient-to-r from-amber-500/15 via-rose-500/15 to-amber-500/15 border border-amber-300 p-3 rounded-2xl text-amber-900 flex items-center justify-between text-xs font-mono font-bold animate-pulse">
+                  <div className="flex items-center gap-2">
+                    <Flame className="h-4 w-4 text-amber-600 animate-bounce" />
+                    <span>SELF-DESTRUCT IN: {formatCountdown(burnRemainingSeconds)}</span>
+                  </div>
+                  <span className="text-[10px] bg-amber-200/80 text-amber-950 px-2 py-0.5 rounded-full font-sans">
+                    Zero-Disk RAM
+                  </span>
+                </div>
+              )}
+
               <div className="space-y-1">
                 <div className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
                   <Sparkles className="h-3.5 w-3.5" />
@@ -706,19 +853,42 @@ export function ReceiveSecureFileModal({
                 </div>
                 <h3 className="text-base font-bold text-slate-900">{downloadReady.name}</h3>
                 <p className="text-xs text-slate-500">
-                  Zero plaintext was transmitted over the network. Decrypted locally.
+                  Decrypted locally in volatile browser memory.
                 </p>
               </div>
 
-              <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 flex flex-col items-center gap-3">
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col items-center gap-2.5">
                 <ShieldCheck className="h-10 w-10 text-emerald-600" />
+                
+                {/* Action 1: Zero-Disk Preview Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (decryptedBlob && downloadReady) {
+                      setPreviewData({
+                        name: downloadReady.name,
+                        blob: decryptedBlob,
+                        mimeType: foundShare?.mimeType,
+                        size: decryptedBlob.size,
+                        url: downloadReady.url,
+                      });
+                      setIsPreviewOpen(true);
+                    }
+                  }}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs shadow-md shadow-blue-500/20 transition-all cursor-pointer"
+                >
+                  <Eye className="h-4 w-4" />
+                  <span>Preview Securely (0-Disk RAM Sandbox)</span>
+                </button>
+
+                {/* Action 2: Save to Disk */}
                 <a
                   href={downloadReady.url}
                   download={downloadReady.name}
-                  className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition-all"
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
                 >
                   <Download className="h-4 w-4" />
-                  <span>Download Decrypted File</span>
+                  <span>Download Decrypted File to Disk</span>
                 </a>
               </div>
             </div>
@@ -807,6 +977,15 @@ export function ReceiveSecureFileModal({
           recipientAddress={foundShare.recipientUserId || "Targeted Recipient"}
         />
       )}
+
+      {/* In-Browser Zero-Disk Secure Preview Modal */}
+      <SecureFilePreviewModal
+        isOpen={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
+        previewData={previewData}
+        burnSecondsRemaining={burnRemainingSeconds}
+        onBurn={triggerBurn}
+      />
     </div>
   );
 }

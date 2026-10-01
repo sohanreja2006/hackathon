@@ -126,8 +126,45 @@ export interface PayloadShare {
   oneTime: boolean;
   passwordProtected: boolean;
   passwordHash?: string; // SHA-256 hash
+  burnAfterReading?: boolean; // Self-destruct enabled
+  burnDurationSeconds?: number; // Countdown seconds after first decryption (e.g. 60, 300)
   status: ShareStatus;
   createdAt: string;
   lastAccessedAt?: string;
 }
 
+export type ActivityEventType =
+  | "wallet_authenticated"
+  | "encryption_started"
+  | "encryption_completed"
+  | "upload_started"
+  | "upload_paused"
+  | "upload_resumed"
+  | "upload_completed"
+  | "integrity_verified"
+  | "integrity_failed"
+  | "file_downloaded"
+  | "file_deleted"
+  | "share_created"
+  | "recipient_authenticated"
+  | "share_accessed"
+  | "share_revoked"
+  | "share_burned"
+  | "share_expired"
+  | "share_limit_reached"
+  | "decryption_started"
+  | "decryption_completed"
+  | "key_registered"
+  | "key_rotation"
+  | "tamper_detected";
+
+export interface PayloadActivityLog {
+  id: string;
+  walletAddress: string;
+  eventType: ActivityEventType;
+  /** Human-readable description — no sensitive data */
+  description: string;
+  /** Optional structured metadata (no private keys, no AES keys) */
+  metadata?: Record<string, string | number | boolean | null>;
+  timestamp: string;
+}

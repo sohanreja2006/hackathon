@@ -6,9 +6,9 @@ import { SecurityFeatures } from "@/components/landing/SecurityFeatures";
 import { WhyCyber10 } from "@/components/landing/WhyCyber10";
 
 export const metadata: Metadata = {
-  title: "CYBER-10 | Decentralized Secure File Storage & Sharing",
+  title: "SecureVault | Decentralized Secure File Storage & Sharing",
   description:
-    "Your Files. Encrypted. Decentralized. Yours. CYBER-10 is a zero-knowledge decentralized file storage and sharing platform engineered for sovereign data privacy.",
+    "Your Files. Encrypted. Decentralized. Yours. SecureVault is a zero-knowledge decentralized file storage and sharing platform engineered for sovereign data privacy.",
 };
 
 export default function HomePage() {
