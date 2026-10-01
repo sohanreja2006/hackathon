@@ -25,10 +25,19 @@ export const SESSION_COOKIE_NAME = "cyber10_session";
 export const SESSION_TTL_SECONDS = 24 * 60 * 60; // 24 hours
 
 function getSessionSecret(): string {
-  return (
-    process.env.AUTH_SESSION_SECRET ||
-    "cyber10-fallback-session-secret-key-32-bytes-long!!"
-  );
+  const secret = process.env.AUTH_SESSION_SECRET;
+  if (!secret) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        "FATAL: AUTH_SESSION_SECRET environment variable is not set. " +
+        "All sessions would use a publicly known fallback secret. " +
+        "Set AUTH_SESSION_SECRET to a cryptographically random 32+ byte string."
+      );
+    }
+    // Development fallback — acceptable only for local dev
+    return "cyber10-dev-only-session-secret-NOT-FOR-PRODUCTION!!";
+  }
+  return secret;
 }
 
 /**

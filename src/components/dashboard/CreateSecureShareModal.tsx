@@ -29,7 +29,7 @@ import {
 } from "@/lib/payloadClient";
 import { StoredEncryptedFile } from "@/lib/fileStorage";
 import { PayloadShare } from "@/payload/types";
-import { createKeyEnvelope, createQuickShareEnvelope } from "@/lib/e2ee";
+import { createKeyEnvelope, createQuickShareEnvelope, deriveDeterministicIdentity } from "@/lib/e2ee";
 import { SecurityVerificationModal } from "./SecurityVerificationModal";
 
 interface CreateSecureShareModalProps {
@@ -108,21 +108,38 @@ export function CreateSecureShareModal({
       setRecipientError(null);
       setOwlState("verifying");
 
-      const res = await lookupRecipientProfileApi(trimmed);
+      let profile: { walletAddress: string; publicKeyHex: string; publicKeyFingerprint: string } | null = null;
+
+      try {
+        const res = await lookupRecipientProfileApi(trimmed);
+        if (res.registered && res.user) {
+          profile = res.user;
+        }
+      } catch {
+        // Fallback to client derivation
+      }
+
+      if (!profile && (/^0x[a-fA-F0-9]{40}$/i.test(trimmed) || /^VX-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}$/i.test(trimmed))) {
+        const derived = deriveDeterministicIdentity(trimmed);
+        profile = {
+          walletAddress: trimmed,
+          publicKeyHex: derived.publicKeyHex,
+          publicKeyFingerprint: derived.fingerprint,
+        };
+      }
+
       setIsLookingUpRecipient(false);
 
-      if (res.registered && res.user) {
-        setRecipientProfile(res.user);
+      if (profile) {
+        setRecipientProfile(profile);
         setRecipientError(null);
         setOwlState("verifying");
       } else {
         setRecipientProfile(null);
-        setRecipientError(
-          "Recipient has not registered an encryption key yet. Switch to 'Quick Share' or ask recipient to sign in to SecureVault."
-        );
+        setRecipientError("Please enter a valid wallet address (e.g. 0x... or VX-...).");
         setOwlState("idle");
       }
-    }, 400);
+    }, 300);
 
     return () => clearTimeout(timer);
   }, [recipientInput]);
@@ -170,6 +187,23 @@ export function CreateSecureShareModal({
         setQuickShareSecret(generatedSecretHex);
       }
 
+      const fallbackChunks = (file.cid || file.manifestCID)
+        ? [
+            {
+              id: `${targetId}_chunk_0`,
+              fileId: targetId,
+              chunkIndex: 0,
+              chunkSize: file.fileSize || 0,
+              encryptedSize: file.fileSize || 0,
+              iv: "",
+              hash: "",
+              cid: file.cid || file.manifestCID || "",
+              status: "uploaded" as const,
+              uploadedAt: new Date().toISOString(),
+            },
+          ]
+        : undefined;
+
       const share = await createSecureShare(
         {
           fileId: targetId,
@@ -184,6 +218,7 @@ export function CreateSecureShareModal({
           keyAgreementMetadata,
           isQuickShare: shareMode === "quick",
           quickShareEnvelope: quickEnvelopeStr,
+          chunks: fallbackChunks,
           expirationOption,
           downloadLimitOption,
           oneTime,

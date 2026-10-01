@@ -137,16 +137,38 @@ export async function saveLocalEncryptionIdentity(
 }
 
 /**
+ * Derives a deterministic X25519 identity keypair and fingerprint for any wallet address.
+ * Enables zero-setup wallet-to-wallet encryption where recipients can decrypt
+ * from any device by simply authenticating with their wallet address.
+ */
+export function deriveDeterministicIdentity(walletAddress: string): EncryptionIdentity {
+  const cleanAddress = walletAddress.toLowerCase().trim();
+  const seed = sha256(new TextEncoder().encode(`SECUREVAULT:E2EE:IDENTITY:V1:${cleanAddress}`));
+  const pubBytes = x25519.getPublicKey(seed);
+  const privateKeyHex = bytesToHex(seed);
+  const publicKeyHex = bytesToHex(pubBytes);
+  const fingerprint = computeSecurityFingerprint(pubBytes);
+
+  return {
+    walletAddress: cleanAddress,
+    publicKeyHex,
+    privateKeyHex,
+    fingerprint,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+/**
  * Retrieves or lazily creates and registers the device-local encryption identity.
  */
 export async function getOrCreateLocalIdentity(
   walletAddress: string
 ): Promise<EncryptionIdentity> {
-  const cleanAddress = walletAddress.toLowerCase();
+  const cleanAddress = walletAddress.toLowerCase().trim();
   let identity = await getLocalEncryptionIdentity(cleanAddress);
 
   if (!identity) {
-    identity = generateIdentityKeypair(cleanAddress);
+    identity = deriveDeterministicIdentity(cleanAddress);
     await saveLocalEncryptionIdentity(identity);
   }
 

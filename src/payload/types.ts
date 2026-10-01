@@ -129,6 +129,8 @@ export interface PayloadShare {
   burnAfterReading?: boolean; // Self-destruct enabled
   burnDurationSeconds?: number; // Countdown seconds after first decryption (e.g. 60, 300)
   status: ShareStatus;
+  manifest?: PayloadManifest | null;
+  chunks?: PayloadChunk[];
   createdAt: string;
   lastAccessedAt?: string;
 }

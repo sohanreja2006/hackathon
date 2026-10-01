@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isValidCid } from "@/lib/ipfs/gateway";
+import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
 
 /**
  * GET /api/files/download?cid=<cid>
@@ -13,8 +14,20 @@ import { isValidCid } from "@/lib/ipfs/gateway";
  * - The server can optionally authenticate to Pinata with PINATA_JWT to use dedicated bandwidth.
  * - The server ONLY receives and proxies CIPHERTEXT (.cyber10enc).
  * - Zero plaintext leaves the client, and zero plaintext touches the server.
+ *
+ * SECURITY: Rate-limited by client IP to prevent bandwidth exhaustion abuse.
  */
 export async function GET(req: NextRequest) {
+  // Rate limit per client IP
+  const ip = getClientIp(req.headers);
+  const rateLimit = checkRateLimit(`ipfs_download:${ip}`);
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: rateLimit.error || "Too many download requests. Please try again later." },
+      { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds || 60) } }
+    );
+  }
+
   const { searchParams } = new URL(req.url);
   const cid = searchParams.get("cid")?.trim();
 

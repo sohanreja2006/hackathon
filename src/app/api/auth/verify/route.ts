@@ -9,6 +9,7 @@ import {
 } from "@/lib/auth/session";
 import { payloadStore } from "@/lib/payload/store";
 import { upsertUser } from "@/lib/payload/db";
+import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
 
 /**
  * POST /api/auth/verify
@@ -22,9 +23,22 @@ import { upsertUser } from "@/lib/payload/db";
  * - Never trusts client-claimed walletAddress without valid ECDSA signature proof.
  * - Nonce is strictly single-use and short-lived.
  * - Issues secure HttpOnly session cookie.
+ * - Rate-limited per IP.
  */
 export async function POST(req: NextRequest) {
   try {
+    const ip = getClientIp(req.headers);
+    const rateLimit = checkRateLimit(`auth_verify:${ip}`);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { success: false, error: rateLimit.error || "Too many authentication attempts. Please try again later." },
+        { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds || 60) } }
+      );
+    }
+    if (rateLimit.delayMs) {
+      await new Promise((r) => setTimeout(r, rateLimit.delayMs));
+    }
+
     const body = await req.json().catch(() => ({}));
     const { message, signature, walletAddress, nonce } = body;
 

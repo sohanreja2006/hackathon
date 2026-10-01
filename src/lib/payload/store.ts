@@ -311,7 +311,13 @@ export const payloadStore = {
 
   getManifestByFile(fileId: string): PayloadManifest | null {
     loadStore();
-    return memoryDb.manifests[fileId] || null;
+    if (!fileId) return null;
+    if (memoryDb.manifests[fileId]) return memoryDb.manifests[fileId];
+    return (
+      Object.values(memoryDb.manifests).find(
+        (m) => m.fileId === fileId || m.manifestCID === fileId || m.id === fileId
+      ) || null
+    );
   },
 
   // ── SHARES ────────────────────────────────────────────────────────────
@@ -335,6 +341,8 @@ export const payloadStore = {
     burnDurationSeconds?: number;
     passwordProtected?: boolean;
     passwordHash?: string;
+    manifest?: PayloadManifest | null;
+    chunks?: PayloadChunk[];
   }): PayloadShare | null {
     loadStore();
     let file = this.getFileById(data.fileId);
@@ -370,6 +378,22 @@ export const payloadStore = {
       memoryDb.files[file.id] = file;
     }
 
+    // If manifest was passed with share, store it
+    if (data.manifest) {
+      memoryDb.manifests[data.manifest.fileId] = data.manifest;
+      if (data.manifest.manifestCID) {
+        memoryDb.manifests[data.manifest.manifestCID] = data.manifest;
+      }
+    }
+
+    // If chunks were passed with share, store them
+    if (Array.isArray(data.chunks)) {
+      for (const c of data.chunks) {
+        const cId = c.id || `${file.id}_chunk_${c.chunkIndex ?? 0}`;
+        memoryDb.chunks[cId] = { ...c, fileId: file.id };
+      }
+    }
+
     const shareId = `shr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     const shareCode = generateShareCode();
     const now = new Date().toISOString();
@@ -400,6 +424,8 @@ export const payloadStore = {
       burnDurationSeconds: data.burnDurationSeconds !== undefined ? Number(data.burnDurationSeconds) : 60,
       passwordProtected: Boolean(data.passwordProtected),
       passwordHash: data.passwordHash,
+      manifest: data.manifest || null,
+      chunks: data.chunks || undefined,
       status: "active",
       createdAt: now,
     };
@@ -554,8 +580,26 @@ export const payloadStore = {
 
     saveStore();
 
-    const manifest = this.getManifestByFile(share.fileId);
-    let chunks = this.getChunksByFile(share.fileId);
+    let manifest = share.manifest || this.getManifestByFile(share.fileId);
+    if (!manifest && share.manifestCID) {
+      manifest = this.getManifestByFile(share.manifestCID);
+    }
+    if (!manifest && share.manifestCID) {
+      manifest = Object.values(memoryDb.manifests).find(
+        (m) => m.manifestCID === share.manifestCID || m.fileId === share.fileId
+      ) || null;
+    }
+
+    let chunks = (share.chunks && share.chunks.length > 0)
+      ? share.chunks
+      : this.getChunksByFile(share.fileId);
+
+    if ((!chunks || chunks.length === 0) && share.manifestCID) {
+      chunks = this.getChunksByFile(share.manifestCID);
+    }
+    if ((!chunks || chunks.length === 0) && manifest) {
+      chunks = this.getChunksByFile(manifest.fileId);
+    }
     if ((!chunks || chunks.length === 0) && manifest?.chunks && manifest.chunks.length > 0) {
       chunks = manifest.chunks.map((mc, idx) => ({
         id: `${share.fileId}_chunk_${idx}`,
@@ -564,11 +608,30 @@ export const payloadStore = {
         chunkSize: mc.size || 8388608,
         encryptedSize: mc.size || 8388608,
         iv: mc.iv || "",
-        hash: mc.hash,
+        hash: mc.hash || (mc as any).sha256 || "",
         cid: mc.cid,
         status: "uploaded",
         uploadedAt: share.createdAt,
       }));
+    }
+
+    // Resilient fallback: If still no chunks, but share has manifestCID or cid:
+    if ((!chunks || chunks.length === 0) && (share.manifestCID || (share as any).cid)) {
+      const fallbackCid = share.manifestCID || (share as any).cid;
+      chunks = [
+        {
+          id: `${share.fileId}_chunk_0`,
+          fileId: share.fileId,
+          chunkIndex: 0,
+          chunkSize: share.fileSize || 8388608,
+          encryptedSize: share.fileSize || 8388608,
+          iv: "",
+          hash: "",
+          cid: fallbackCid,
+          status: "uploaded",
+          uploadedAt: share.createdAt,
+        },
+      ];
     }
 
     return {

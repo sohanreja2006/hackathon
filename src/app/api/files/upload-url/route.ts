@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedWallet } from "@/lib/auth/session";
 import { createPinataSignedUploadUrl } from "@/lib/ipfs/pinata";
+import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
 
 /**
  * POST /api/files/upload-url
@@ -11,6 +12,7 @@ import { createPinataSignedUploadUrl } from "@/lib/ipfs/pinata";
  * - Requires verified SIWE wallet session.
  * - PINATA_JWT stays strictly server-side.
  * - Browser receives a time-limited (5 min) presigned URL.
+ * - Rate limited per wallet/IP to protect bandwidth/quota.
  * - Enables uploading large files (up to 500 MB) directly from the browser
  *   to Pinata, completely avoiding Vercel serverless function payload limits (4.5 MB).
  */
@@ -23,14 +25,19 @@ export async function POST(req: NextRequest) {
   }
 
   const wallet = await getAuthenticatedWallet();
-  const vaultXHeader = req.headers.get("x-vaultx-id") || req.headers.get("x-vaultx-identity");
-  const vaultXId = vaultXHeader || body?.vaultXId;
-  const isVaultXValid = typeof vaultXId === "string" && /^VX-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}$/i.test(vaultXId.trim());
-
-  if (!wallet && !isVaultXValid) {
+  if (!wallet) {
     return NextResponse.json(
-      { success: false, error: "Unauthorized. Please connect MetaMask or VaultX Secure Wallet." },
+      { success: false, error: "Unauthorized. Please sign in with your wallet." },
       { status: 401 }
+    );
+  }
+
+  const ip = getClientIp(req.headers);
+  const rateLimit = checkRateLimit(`upload_url:${wallet.address.toLowerCase()}:${ip}`);
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { success: false, error: rateLimit.error || "Too many upload requests. Please try again later." },
+      { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds || 60) } }
     );
   }
 

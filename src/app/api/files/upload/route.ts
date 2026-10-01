@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedWallet } from "@/lib/auth/session";
 import { uploadEncryptedFileToPinata, MAX_ENCRYPTED_SIZE_BYTES } from "@/lib/ipfs/pinata";
+import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
 import type { UploadApiResponse } from "@/types/files";
 
 /**
@@ -42,19 +43,23 @@ export async function POST(req: NextRequest): Promise<NextResponse<UploadApiResp
   }
 
   const wallet = await getAuthenticatedWallet();
-  const vaultXHeader = req.headers.get("x-vaultx-id") || req.headers.get("x-vaultx-identity");
-  const vaultXForm = (formData.get("vaultXId") as string | null)?.trim();
-  const vaultXId = vaultXHeader || vaultXForm;
-  const isVaultXValid = typeof vaultXId === "string" && /^VX-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}$/i.test(vaultXId.trim());
-
-  if (!wallet && !isVaultXValid) {
+  if (!wallet) {
     return NextResponse.json(
-      { success: false, error: "Unauthorized. Please connect MetaMask or VaultX Secure Wallet." },
+      { success: false, error: "Unauthorized. Please sign in with your wallet." },
       { status: 401 }
     );
   }
 
-  const ownerAddress = wallet?.address || vaultXId!;
+  const ip = getClientIp(req.headers);
+  const rateLimit = checkRateLimit(`upload_file:${wallet.address.toLowerCase()}:${ip}`);
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { success: false, error: rateLimit.error || "Too many upload requests. Please try again later." },
+      { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds || 60) } }
+    );
+  }
+
+  const ownerAddress = wallet.address;
 
   const encryptedFileEntry = formData.get("encryptedFile");
   const originalName = (formData.get("originalName") as string | null)?.trim() || "unknown";

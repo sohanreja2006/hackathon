@@ -35,9 +35,10 @@ export async function POST(req: NextRequest) {
       await new Promise((r) => setTimeout(r, rateLimit.delayMs));
     }
 
-    // Authenticate accessor if present (via wallet header or session)
+    // SECURITY: Only use the cryptographically verified wallet address.
+    // Never trust body-supplied wallet identity.
     const auth = await getPayloadAuth(req);
-    const accessorWallet = auth?.walletAddress || body.accessorWallet;
+    const accessorWallet = auth?.walletAddress || undefined;
 
     const result = await payloadService.accessShare(normalizedCode, accessorWallet, password);
 

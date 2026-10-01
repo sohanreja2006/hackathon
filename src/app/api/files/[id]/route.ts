@@ -60,7 +60,25 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const updated = await updateFileRecord(id, body);
+
+    // SECURITY: Allowlist of fields the owner may update.
+    // Never pass the raw body — that would let an attacker overwrite ownerWallet, fileId, etc.
+    const allowedFields = ["status", "manifestCID"] as const;
+    const filtered: Record<string, unknown> = {};
+    for (const key of allowedFields) {
+      if (key in body) {
+        filtered[key] = body[key];
+      }
+    }
+
+    if (Object.keys(filtered).length === 0) {
+      return NextResponse.json(
+        { success: false, error: "No valid update fields provided." },
+        { status: 400 }
+      );
+    }
+
+    const updated = await updateFileRecord(id, filtered);
 
     return NextResponse.json({ success: true, file: updated });
   } catch (err: unknown) {

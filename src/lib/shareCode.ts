@@ -37,11 +37,30 @@ export function generateShareCode(): string {
 
 /**
  * Normalizes and automatically formats raw user input into SV-XXXX-XXXX-XXXX
- * or preserves shr_ IDs.
+ * or preserves shr_ IDs. Intelligently extracts share codes from full URLs.
  */
 export function formatShareCodeInput(raw: string): string {
   if (!raw) return "";
   const trimmed = raw.trim();
+
+  // If a full URL or string containing an explicit SV code was pasted, extract it cleanly
+  const matchSv = trimmed.match(/SV-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}/i);
+  if (matchSv) {
+    return matchSv[0].toUpperCase();
+  }
+
+  // If a URL parameter ?code=... was pasted
+  const matchParam = trimmed.match(/[?&]code=([A-Za-z0-9_-]+)/i);
+  if (matchParam && matchParam[1]) {
+    return formatShareCodeInput(matchParam[1]);
+  }
+
+  // If shr_ or file_ ID was pasted
+  const matchShr = trimmed.match(/(shr_[A-Za-z0-9_]+|file_[A-Za-z0-9_]+)/i);
+  if (matchShr) {
+    return matchShr[1];
+  }
+
   if (trimmed.startsWith("shr_") || trimmed.startsWith("file_")) {
     return trimmed;
   }
@@ -70,6 +89,23 @@ export function formatShareCodeInput(raw: string): string {
   }
 
   return formatted;
+}
+
+/**
+ * Extracts Quick Share secret from a URL, hash fragment, query param, or raw string.
+ */
+export function extractSecretFromText(raw: string): string | null {
+  if (!raw) return null;
+  const match = raw.match(/secret=([a-fA-F0-9]{32,64})/i) ||
+                raw.match(/#secret=([a-fA-F0-9]{32,64})/i) ||
+                raw.match(/#([a-fA-F0-9]{64})/i);
+  if (match) return match[1];
+
+  const clean = raw.trim().replace(/^#?secret=/i, "").replace(/^0x/i, "");
+  if (/^[a-fA-F0-9]{64}$/i.test(clean)) {
+    return clean;
+  }
+  return null;
 }
 
 /**

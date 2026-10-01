@@ -9,39 +9,18 @@ export interface AuthenticatedPayloadContext {
 
 /**
  * Validates request authorization and returns the authenticated wallet address.
- * Supports:
- * 1. Cryptographic SIWE cookie session
- * 2. In-browser VaultX Secure Wallet header ('x-vaultx-id')
+ *
+ * SECURITY: Only accepts the cryptographically verified SIWE session cookie.
+ * HTTP headers (x-vaultx-id, x-wallet-address, etc.) are NEVER trusted as
+ * proof of identity because any attacker can set arbitrary headers.
  */
 export async function getPayloadAuth(
-  req: NextRequest
+  _req: NextRequest
 ): Promise<AuthenticatedPayloadContext | null> {
-  // Check SIWE session first
   const siweWallet = await getAuthenticatedWallet();
   if (siweWallet?.address) {
-    // Record user activity
     payloadStore.findOrCreateUser(siweWallet.address);
     return { walletAddress: siweWallet.address.toLowerCase() };
-  }
-
-  // Check VaultX wallet identity header
-  const vxId = req.headers.get("x-vaultx-id") || req.headers.get("x-vaultx-identity");
-  if (vxId && /^VX-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}$/i.test(vxId.trim())) {
-    const address = vxId.trim();
-    payloadStore.findOrCreateUser(address, "VaultX-Local");
-    return { walletAddress: address.toLowerCase() };
-  }
-
-  // Check x-wallet-address or x-owner-wallet header for Web3 wallets
-  const walletHeader =
-    req.headers.get("x-wallet-address") ||
-    req.headers.get("x-owner-wallet") ||
-    req.headers.get("x-user-address") ||
-    req.headers.get("x-payload-wallet");
-  if (walletHeader && /^0x[a-fA-F0-9]{40}$/i.test(walletHeader.trim())) {
-    const address = walletHeader.trim().toLowerCase();
-    payloadStore.findOrCreateUser(address, "Web3-Wallet");
-    return { walletAddress: address };
   }
 
   return null;
@@ -127,6 +106,8 @@ export const payloadService = {
     burnDurationSeconds?: number;
     passwordProtected?: boolean;
     passwordHash?: string;
+    manifest?: PayloadManifest | null;
+    chunks?: PayloadChunk[];
   }) {
     return payloadStore.createShare(data);
   },

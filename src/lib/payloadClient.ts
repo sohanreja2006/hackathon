@@ -237,6 +237,8 @@ export interface CreateSecureShareParams {
   burnDurationSeconds?: number;
   passwordProtected?: boolean;
   password?: string;
+  manifest?: any;
+  chunks?: any[];
 }
 
 export async function createSecureShare(

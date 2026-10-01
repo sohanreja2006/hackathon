@@ -57,9 +57,15 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
         share &&
         share.fileId === fileId &&
         share.status === "active" &&
-        (!share.expiresAt || new Date(share.expiresAt) > new Date())
+        (!share.expiresAt || new Date(share.expiresAt) > new Date()) &&
+        !share.passwordProtected
       ) {
-        authorized = true;
+        // If restricted to a specific recipient wallet, caller must match
+        const recipient = share.recipientUserId?.toLowerCase();
+        const isRestricted = Boolean(recipient && recipient.startsWith("0x") && recipient !== "public");
+        if (!isRestricted || (callerWallet && callerWallet === recipient)) {
+          authorized = true;
+        }
       }
     }
 

@@ -4,24 +4,23 @@ import { getPayloadAuth, payloadService } from "@/lib/payload/client";
 /**
  * POST /api/payload/users/keys
  * Registers or updates the user's public encryption key and fingerprint.
- * 
- * SECURITY INVARIANT:
+ *
+ * SECURITY INVARIANTS:
+ * - REQUIRES authenticated SIWE session.
+ * - Key is registered ONLY for the authenticated wallet (never body-supplied).
  * - NEVER accepts or stores private keys.
- * - Authenticated via Web3 wallet header or SIWE session.
  */
 export async function POST(req: NextRequest) {
   try {
     const auth = await getPayloadAuth(req);
-    const body = await req.json();
-    const walletAddress = auth?.walletAddress || body.walletAddress;
-
-    if (!walletAddress || !/^0x[a-fA-F0-9]{40}$/i.test(walletAddress)) {
+    if (!auth?.walletAddress) {
       return NextResponse.json(
-        { success: false, error: "Unauthorized. Please connect wallet." },
+        { success: false, error: "Unauthorized. Please sign in with your wallet." },
         { status: 401 }
       );
     }
 
+    const body = await req.json();
     const publicKey = body.publicKeyHex || body.publicEncryptionKey;
     const fingerprint = body.fingerprint || body.publicKeyFingerprint;
 
@@ -32,8 +31,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // SECURITY: Always register for the authenticated wallet, never body-supplied
     const user = payloadService.registerUserPublicKey(
-      walletAddress.toLowerCase(),
+      auth.walletAddress,
       publicKey,
       fingerprint
     );

@@ -69,6 +69,8 @@ export async function POST(req: NextRequest) {
       burnDurationSeconds = 60,
       passwordProtected = false,
       password = "",
+      manifest = null,
+      chunks = [],
     } = body;
 
     const resolvedFileId = fileId || cid || manifestCID;
@@ -114,6 +116,8 @@ export async function POST(req: NextRequest) {
       burnDurationSeconds: Number(burnDurationSeconds) || 60,
       passwordProtected: Boolean(passwordProtected && passwordHash),
       passwordHash,
+      manifest: manifest || null,
+      chunks: Array.isArray(chunks) ? chunks : undefined,
     });
 
     if (!newShare) {
