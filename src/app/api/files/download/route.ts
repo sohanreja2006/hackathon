@@ -38,6 +38,24 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  // 1. Check local persistent IPFS store first (instant response, zero network latency)
+  try {
+    const { getLocalIpfsPayload } = await import("@/lib/ipfs/localStore");
+    const localBuf = getLocalIpfsPayload(cid);
+    if (localBuf) {
+      return new NextResponse(new Uint8Array(localBuf), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/octet-stream",
+          "Cache-Control": "public, max-age=31536000, immutable",
+          "X-IPFS-CID": cid,
+        },
+      });
+    }
+  } catch {
+    // ignore
+  }
+
   const pinataJwt = process.env.PINATA_JWT?.trim();
 
   // Gateways to query in sequence

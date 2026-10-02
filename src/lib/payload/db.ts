@@ -732,7 +732,7 @@ export async function getShareRecord(shareId: string): Promise<DBShare | null> {
         (s) =>
           s.shareId === normalized ||
           s.id === normalized ||
-          (s as any).shareCode === normalized
+          (s as { shareCode?: string }).shareCode === normalized
       ) as DBShare) || null;
   }
 
@@ -747,10 +747,14 @@ export async function getShareRecord(shareId: string): Promise<DBShare | null> {
           const storeShare =
             storeData.shares?.[normalized] ||
             Object.values(storeData.shares || {}).find(
-              (s: any) =>
-                s.shareId === normalized ||
-                s.id === normalized ||
-                s.shareCode === normalized
+              (s: unknown) => {
+                const item = s as { shareId?: string; id?: string; shareCode?: string };
+                return (
+                  item.shareId === normalized ||
+                  item.id === normalized ||
+                  item.shareCode === normalized
+                );
+              }
             );
           if (storeShare) {
             found = {
@@ -812,7 +816,7 @@ export async function updateShareRecord(
   }
 
   const snap = readSnapshot();
-  let foundKey = Object.keys(snap.shares).find(
+  const foundKey = Object.keys(snap.shares).find(
     (k) =>
       k === normalized ||
       snap.shares[k].shareId === normalized ||

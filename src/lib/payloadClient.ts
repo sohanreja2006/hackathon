@@ -227,7 +227,7 @@ export interface CreateSecureShareParams {
   recipientUserId?: string;
   recipientPublicKeyFingerprint?: string;
   encryptedFileKey?: string;
-  keyAgreementMetadata?: any;
+  keyAgreementMetadata?: Record<string, unknown> | import("@/lib/e2ee").KeyAgreementMetadata;
   isQuickShare?: boolean;
   quickShareEnvelope?: string;
   expirationOption?: "never" | "1h" | "24h" | "7d" | "30d";
@@ -237,8 +237,8 @@ export interface CreateSecureShareParams {
   burnDurationSeconds?: number;
   passwordProtected?: boolean;
   password?: string;
-  manifest?: any;
-  chunks?: any[];
+  manifest?: PayloadManifest | null;
+  chunks?: PayloadChunk[];
 }
 
 export async function createSecureShare(

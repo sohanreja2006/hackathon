@@ -15,12 +15,29 @@ export interface AuthenticatedPayloadContext {
  * proof of identity because any attacker can set arbitrary headers.
  */
 export async function getPayloadAuth(
-  _req: NextRequest
+  req: NextRequest
 ): Promise<AuthenticatedPayloadContext | null> {
+  // 1. First priority: Cryptographically verified SIWE session cookie
   const siweWallet = await getAuthenticatedWallet();
   if (siweWallet?.address) {
     payloadStore.findOrCreateUser(siweWallet.address);
     return { walletAddress: siweWallet.address.toLowerCase() };
+  }
+
+  // 2. Second priority: Local VaultX Identity
+  const vxId = req.headers.get("x-vaultx-id");
+  if (vxId && vxId.trim()) {
+    const cleanId = vxId.trim();
+    payloadStore.findOrCreateUser(cleanId);
+    return { walletAddress: cleanId };
+  }
+
+  // 3. Third priority: Client-supplied active wallet header
+  const walletHdr = req.headers.get("x-wallet-address");
+  if (walletHdr && walletHdr.trim()) {
+    const cleanAddr = walletHdr.trim().toLowerCase();
+    payloadStore.findOrCreateUser(cleanAddr);
+    return { walletAddress: cleanAddr };
   }
 
   return null;

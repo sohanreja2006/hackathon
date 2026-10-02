@@ -415,13 +415,19 @@ export function VaultUploadPanel() {
         formData.append("originalSize", String(chunk.plaintextSize));
         if (isVaultXActive && vaultXIdentity?.id) {
           formData.append("vaultXId", vaultXIdentity.id);
+        } else if (address) {
+          formData.append("ownerAddress", address);
         }
 
         try {
           const res = await fetch("/api/files/upload", {
             method: "POST",
             headers: {
-              ...(isVaultXActive && vaultXIdentity?.id ? { "x-vaultx-id": vaultXIdentity.id } : {}),
+              ...(isVaultXActive && vaultXIdentity?.id
+                ? { "x-vaultx-id": vaultXIdentity.id }
+                : address
+                ? { "x-wallet-address": address }
+                : {}),
             },
             body: formData,
           });
@@ -448,6 +454,7 @@ export function VaultUploadPanel() {
 
       // Record chunk in Payload
       if (activePayloadId) {
+        const activeOwner = (isVaultXActive && vaultXIdentity?.id) ? vaultXIdentity.id : address;
         recordPayloadChunk(
           {
             fileId: activePayloadId,
@@ -459,7 +466,7 @@ export function VaultUploadPanel() {
             cid: chunkCid,
             status: "verified",
           },
-          isVaultXActive ? vaultXIdentity?.id : undefined
+          activeOwner
         ).catch(() => {});
       }
     }
@@ -477,39 +484,88 @@ export function VaultUploadPanel() {
     const fileManifest = buildManifest(encResult, chunkCids);
     let manifestCid = chunkCids[0] || "";
 
-    try {
-      const manifestBlob = new Blob([JSON.stringify(fileManifest, null, 2)], {
-        type: "application/json",
-      });
-      const manifestFilename = `${selectedFile.name}.manifest.json`;
+    // Always upload a manifest — even for single-chunk files — so the CID is always recoverable
+    if (true || encResult.totalChunks > 1) {
+      try {
+        const manifestBlob = new Blob([JSON.stringify(fileManifest, null, 2)], {
+          type: "application/json",
+        });
+        const manifestFilename = `${selectedFile.name}.manifest.json`;
 
-      const manifestForm = new FormData();
-      manifestForm.append("encryptedFile", manifestBlob, manifestFilename);
-      manifestForm.append("originalName", manifestFilename);
-      manifestForm.append("originalMime", "application/json");
-      manifestForm.append("originalSize", String(manifestBlob.size));
-      if (isVaultXActive && vaultXIdentity?.id) {
-        manifestForm.append("vaultXId", vaultXIdentity.id);
+        let uploadedManifestCid: string | null = null;
+
+        // Try direct Pinata upload first
+        try {
+          const urlRes = await fetch("/api/files/upload-url", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(isVaultXActive && vaultXIdentity?.id ? { "x-vaultx-id": vaultXIdentity.id } : {}),
+            },
+            body: JSON.stringify({
+              filename: manifestFilename,
+              vaultXId: isVaultXActive ? vaultXIdentity?.id : undefined,
+            }),
+          });
+
+          if (urlRes.ok) {
+            const { uploadUrl } = await urlRes.json();
+            if (uploadUrl) {
+              const mForm = new FormData();
+              mForm.append("file", manifestBlob, manifestFilename);
+              const pinataRes = await fetch(uploadUrl, { method: "POST", body: mForm });
+              if (pinataRes.ok) {
+                const pinataData = await pinataRes.json();
+                uploadedManifestCid = pinataData?.data?.cid ?? null;
+              }
+            }
+          }
+        } catch {
+          // Direct upload failed, try server proxy below
+        }
+
+        // Fallback to server proxy
+        if (!uploadedManifestCid) {
+          const manifestForm = new FormData();
+          manifestForm.append("encryptedFile", manifestBlob, manifestFilename);
+          manifestForm.append("originalName", manifestFilename);
+          manifestForm.append("originalMime", "application/json");
+          manifestForm.append("originalSize", String(manifestBlob.size));
+          if (isVaultXActive && vaultXIdentity?.id) {
+            manifestForm.append("vaultXId", vaultXIdentity.id);
+          } else if (address) {
+            manifestForm.append("ownerAddress", address);
+          }
+
+          const mRes = await fetch("/api/files/upload", {
+            method: "POST",
+            headers: {
+              ...(isVaultXActive && vaultXIdentity?.id
+                ? { "x-vaultx-id": vaultXIdentity.id }
+                : address
+                ? { "x-wallet-address": address }
+                : {}),
+            },
+            body: manifestForm,
+          });
+
+          const mData: UploadApiResponse = await mRes.json();
+          if (mData.success && mData.cid) {
+            uploadedManifestCid = mData.cid;
+          }
+        }
+
+        if (uploadedManifestCid) {
+          manifestCid = uploadedManifestCid;
+        }
+      } catch (manifestUploadErr) {
+        console.warn("Manifest IPFS upload fallback:", manifestUploadErr);
       }
-
-      const mRes = await fetch("/api/files/upload", {
-        method: "POST",
-        headers: {
-          ...(isVaultXActive && vaultXIdentity?.id ? { "x-vaultx-id": vaultXIdentity.id } : {}),
-        },
-        body: manifestForm,
-      });
-
-      const mData: UploadApiResponse = await mRes.json();
-      if (mData.success && mData.cid) {
-        manifestCid = mData.cid;
-      }
-    } catch (manifestUploadErr) {
-      console.warn("Manifest IPFS upload fallback:", manifestUploadErr);
     }
 
     if (activePayloadId && manifestCid) {
       try {
+        const activeOwner = (isVaultXActive && vaultXIdentity?.id) ? vaultXIdentity.id : address;
         await savePayloadManifestRecord(
           {
             fileId: activePayloadId,
@@ -527,7 +583,7 @@ export function VaultUploadPanel() {
               size: c.encryptedSize,
             })),
           },
-          isVaultXActive ? vaultXIdentity?.id : undefined
+          activeOwner
         );
       } catch (e) {
         console.warn("Payload manifest registration note:", e);
@@ -545,6 +601,12 @@ export function VaultUploadPanel() {
       storeFileKey(ownerKey, encResult.fileId, encResult.keyHex, selectedFile.name).catch(() => {});
       if (manifestCid && manifestCid !== encResult.fileId) {
         storeFileKey(ownerKey, manifestCid, encResult.keyHex, selectedFile.name).catch(() => {});
+      }
+      // Also store key under every individual chunk CID for fallback lookup
+      for (const chunkCid of chunkCids) {
+        if (chunkCid && chunkCid !== manifestCid && chunkCid !== encResult.fileId) {
+          storeFileKey(ownerKey, chunkCid, encResult.keyHex, selectedFile.name).catch(() => {});
+        }
       }
 
       const ext = selectedFile.name.split(".").pop()?.toUpperCase() || "BIN";
@@ -568,7 +630,53 @@ export function VaultUploadPanel() {
         logicalPath: `/vault/${ownerKey}/${activePayloadId || manifestCid}/`,
         uploadStatus: "completed",
         integrityStatus: "verified",
+        ivHex: encResult.chunks[0]?.iv,
+        chunks: encResult.chunks.map((c, idx) => ({
+          index: c.chunkIndex,
+          cid: chunkCids[idx] || "",
+          hash: c.sha256,
+          iv: c.iv,
+          size: c.encryptedSize,
+        })),
       });
+
+      // If the manifest CID is different from the chunk CID(s), also register
+      // each chunk CID in localStorage so Strategy 2 can find chunk metadata
+      // when the user enters a raw chunk CID instead of the manifest CID.
+      const ext2 = selectedFile.name.split(".").pop()?.toUpperCase() || "BIN";
+      for (const chunkCid of chunkCids) {
+        if (chunkCid && chunkCid !== manifestCid) {
+          saveUserFile({
+            id: activePayloadId || encResult.fileId,
+            cid: chunkCid,
+            fileName: selectedFile.name,
+            originalName: selectedFile.name,
+            extension: ext2,
+            fileSize: selectedFile.size,
+            mimeType: selectedFile.type || "application/octet-stream",
+            uploadedAt: finalUploadedAt || new Date().toISOString(),
+            ownerAddress: ownerKey,
+            keyHex: encResult.keyHex,
+            wrappedKey: isVaultXActive ? wrappedKey : undefined,
+            algorithm: "AES-256-GCM",
+            sharedWith: [],
+            totalChunks: calcChunks,
+            chunkSize: 8388608,
+            manifestCID: manifestCid,
+            logicalPath: `/vault/${ownerKey}/${activePayloadId || manifestCid}/`,
+            uploadStatus: "completed",
+            integrityStatus: "verified",
+            ivHex: encResult.chunks[0]?.iv,
+            chunks: encResult.chunks.map((c, idx) => ({
+              index: c.chunkIndex,
+              cid: chunkCids[idx] || "",
+              hash: c.sha256,
+              iv: c.iv,
+              size: c.encryptedSize,
+            })),
+          });
+        }
+      }
     }
   }, [selectedFile, payloadFileId, address, isVaultXActive, vaultXIdentity]);
 

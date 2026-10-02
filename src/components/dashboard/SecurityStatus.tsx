@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Cpu, Lock, Key, CheckCircle2 } from "lucide-react";
 import { useAccount } from "wagmi";
 import { useVaultXWallet } from "@/context/VaultXWalletContext";
@@ -8,11 +8,9 @@ import { useVaultXWallet } from "@/context/VaultXWalletContext";
 export function SecurityStatus() {
   const { isConnected, address } = useAccount();
   const { isConnected: isVaultXConnected, identity: vaultXIdentity } = useVaultXWallet();
-  const [subtleReady, setSubtleReady] = useState(false);
-
-  useEffect(() => {
-    setSubtleReady(typeof window !== "undefined" && !!window.crypto?.subtle);
-  }, []);
+  const [subtleReady] = useState(
+    () => typeof window !== "undefined" && !!window.crypto?.subtle
+  );
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">

@@ -63,11 +63,11 @@ export function FileDetailsModal({
   const [decryptError, setDecryptError] = useState<string | null>(null);
   const [showKeyInput, setShowKeyInput] = useState(!localKeyHex);
 
-  useEffect(() => {
-    if (localKeyHex) {
-      setKeyInput(localKeyHex);
-    }
-  }, [localKeyHex]);
+  const [prevLocalKeyHex, setPrevLocalKeyHex] = useState(localKeyHex);
+  if (localKeyHex !== prevLocalKeyHex) {
+    setPrevLocalKeyHex(localKeyHex);
+    setKeyInput(localKeyHex || "");
+  }
 
   useEffect(() => {
     if (!isOpen || !fileId) return;

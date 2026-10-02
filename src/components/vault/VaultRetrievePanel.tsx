@@ -28,7 +28,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { decryptFile, downloadBlob, formatBytes } from "@/lib/crypto";
-import { decryptFileFromManifest, type FileManifest, retrieveFileKey } from "@/lib/crypto/index";
+import { decryptFileFromManifest, type FileManifest, retrieveFileKey, verifyAndDecryptChunk, importKeyHex } from "@/lib/crypto/index";
 import { fetchFromIpfs, getIpfsUrl, isValidCid, getGatewayBase } from "@/lib/ipfs/gateway";
 import { cn } from "@/lib/utils";
 import { useVaultXWallet } from "@/context/VaultXWalletContext";
@@ -57,7 +57,9 @@ export function VaultRetrievePanel() {
     let cancelled = false;
     const cid = cidInput.trim();
     if (!isValidCid(cid)) {
-      setSavedVaultKey(null);
+      setTimeout(() => {
+        if (!cancelled) setSavedVaultKey(null);
+      }, 0);
       return;
     }
 
@@ -65,7 +67,9 @@ export function VaultRetrievePanel() {
       ? vaultXIdentity.id
       : (address?.toLowerCase() ?? "");
     if (!ownerKey) {
-      setSavedVaultKey(null);
+      setTimeout(() => {
+        if (!cancelled) setSavedVaultKey(null);
+      }, 0);
       return;
     }
 
@@ -91,9 +95,13 @@ export function VaultRetrievePanel() {
         })
         .catch(() => {});
     } else if (match?.keyHex) {
-      setSavedVaultKey(match.keyHex);
+      setTimeout(() => {
+        if (!cancelled) setSavedVaultKey(match.keyHex);
+      }, 0);
     } else {
-      setSavedVaultKey(null);
+      setTimeout(() => {
+        if (!cancelled) setSavedVaultKey(null);
+      }, 0);
     }
 
     return () => { cancelled = true; };
@@ -169,14 +177,133 @@ export function VaultRetrievePanel() {
         decryptedBlob = manifestResult.blob;
         decryptedName = manifestResult.fileName;
       } else {
-        const encryptedFile = new File([rawBuffer], `${cid}.cyber10enc`, {
-          type: "application/octet-stream",
-        });
-        const decrypted = await decryptFile(encryptedFile, key, (p) => {
-          setStatusMessage(p.message);
-        });
-        decryptedBlob = decrypted.plainBlob;
-        decryptedName = decrypted.originalName;
+        const u8 = new Uint8Array(rawBuffer);
+        const hasCybrMagic = u8.length >= 4 && u8[0] === 0x43 && u8[1] === 0x59 && u8[2] === 0x42 && u8[3] === 0x52;
+
+        if (hasCybrMagic) {
+          const encryptedFile = new File([rawBuffer], `${cid}.cyber10enc`, {
+            type: "application/octet-stream",
+          });
+          const decrypted = await decryptFile(encryptedFile, key, (p) => {
+            setStatusMessage(p.message);
+          });
+          decryptedBlob = decrypted.plainBlob;
+          decryptedName = decrypted.originalName;
+        } else {
+          // Fallback: multi-strategy recovery when data has no CYBR header
+          setStatusMessage("Analyzing ciphertext and checking vault registry...");
+          const ownerKey = (isVaultXConnected && vaultXIdentity?.id)
+            ? vaultXIdentity.id
+            : (address?.toLowerCase() ?? "");
+          const files = getUserFiles(ownerKey);
+          const match = files.find((f) => f.cid === cid || f.manifestCID === cid || f.id === cid);
+
+          let recoveredBuffer: ArrayBuffer | null = null;
+          let recoveredName = match?.originalName || match?.fileName || `${cid.slice(0, 10)}.bin`;
+          let recoveredMime = match?.mimeType || "application/octet-stream";
+
+          // Strategy 1: Fetch a distinct manifestCID from IPFS and decrypt via manifest
+          if (!recoveredBuffer && match?.manifestCID && match.manifestCID !== cid) {
+            try {
+              setStatusMessage("Fetching file manifest from IPFS...");
+              const mBuffer = await fetchFromIpfs(match.manifestCID);
+              const mText = new TextDecoder().decode(mBuffer);
+              if (mText.trim().startsWith("{")) {
+                const parsedM = JSON.parse(mText);
+                if (parsedM.algorithm === "AES-256-GCM" && Array.isArray(parsedM.chunks)) {
+                  const mRes = await decryptFileFromManifest(parsedM, key, fetchFromIpfs, (p) => setStatusMessage(p.message));
+                  recoveredBuffer = await mRes.blob.arrayBuffer();
+                  recoveredName = mRes.fileName;
+                  recoveredMime = mRes.mimeType;
+                }
+              }
+            } catch {
+              // ignore, try next strategy
+            }
+          }
+
+          // Strategy 2: Build synthetic FileManifest from locally stored chunk metadata
+          if (!recoveredBuffer && match?.chunks && match.chunks.length > 0) {
+            try {
+              setStatusMessage("Reconstructing file from locally stored chunk metadata...");
+              const syntheticManifest: FileManifest = {
+                version: 2,
+                fileId: match.id || cid,
+                fileName: recoveredName,
+                fileSize: match.fileSize || 0,
+                mimeType: recoveredMime,
+                chunkSize: match.chunkSize || 8388608,
+                totalChunks: match.chunks.length,
+                algorithm: "AES-256-GCM",
+                hashAlgorithm: "SHA-256",
+                chunks: match.chunks.map((c) => ({
+                  index: c.index,
+                  iv: c.iv || match.ivHex || "",
+                  sha256: c.hash || "",
+                  cid: c.cid || cid,
+                  plaintextSize: c.size || 0,
+                  encryptedSize: c.size || 0,
+                })),
+              };
+              const mRes = await decryptFileFromManifest(syntheticManifest, key, fetchFromIpfs, (p) => setStatusMessage(p.message));
+              recoveredBuffer = await mRes.blob.arrayBuffer();
+              recoveredName = mRes.fileName;
+              recoveredMime = mRes.mimeType;
+            } catch {
+              // ignore, try next strategy
+            }
+          }
+
+          // Strategy 3: Direct chunk decryption with stored IV + multiple candidate file IDs
+          if (!recoveredBuffer) {
+            const ivHex = match?.ivHex || match?.chunks?.[0]?.iv;
+            const candidateIds = [match?.id, cid, match?.manifestCID].filter((x): x is string => Boolean(x));
+            if (ivHex) {
+              try {
+                setStatusMessage("Attempting direct chunk decryption with stored IV...");
+                recoveredBuffer = await verifyAndDecryptChunk(
+                  rawBuffer,
+                  key,
+                  0,
+                  "",
+                  ivHex,
+                  match?.id || "",
+                  candidateIds
+                );
+              } catch {
+                // ignore
+              }
+            }
+          }
+
+          // Strategy 4: Raw AES-GCM with first 12 bytes as prepended IV
+          if (!recoveredBuffer && rawBuffer.byteLength > 28) {
+            try {
+              setStatusMessage("Attempting raw AES-GCM decryption (prepended IV format)...");
+              const rawIv = u8.slice(0, 12);
+              const rawCt = u8.slice(12);
+              const cryptoKey = await importKeyHex(key);
+              recoveredBuffer = await crypto.subtle.decrypt(
+                { name: "AES-GCM", iv: rawIv as unknown as BufferSource },
+                cryptoKey,
+                rawCt
+              );
+            } catch {
+              // ignore
+            }
+          }
+
+          if (recoveredBuffer) {
+            decryptedBlob = new Blob([recoveredBuffer], { type: recoveredMime });
+            decryptedName = recoveredName;
+          } else {
+            throw new Error(
+              match
+                ? "Decryption failed: this file was uploaded in a legacy format and its manifest is no longer available on IPFS. Please re-upload the file to generate a new recoverable CID."
+                : "Invalid file format: not a recognized CYBER-10 encrypted file. Verify the IPFS CID (manifest or chunk) and the 64-character AES-256 decryption key."
+            );
+          }
+        }
       }
 
       setResult({

@@ -103,8 +103,9 @@ export function RecentFiles() {
     if (!fileToDelete) return;
     try {
       setIsDeleting(true);
+      const activeOwner = (isVaultXConnected && vaultXIdentity?.id) ? vaultXIdentity.id : address;
       if (fileToDelete.id) {
-        await deletePayloadFile(fileToDelete.id, vaultXIdentity?.id);
+        await deletePayloadFile(fileToDelete.id, activeOwner);
       }
       deleteVaultFile(fileToDelete.id);
       if (fileToDelete.cid) {
@@ -123,11 +124,12 @@ export function RecentFiles() {
 
   // Load all user files from registry & Payload CMS backend
   const refreshFiles = useCallback(async () => {
+    const activeOwner = (isVaultXConnected && vaultXIdentity?.id) ? vaultXIdentity.id : address;
     const localFiles = getAllVaultFiles([address, vaultXIdentity?.id]);
 
     let payloadDocs: StoredEncryptedFile[] = [];
     try {
-      const payloadFiles = await fetchPayloadFiles(vaultXIdentity?.id);
+      const payloadFiles = await fetchPayloadFiles(activeOwner);
       payloadDocs = payloadFiles.map((pf) => {
         const matchingLocal = localFiles.find(
           (lf) => lf.cid === pf.manifestCID || lf.fileName === pf.originalName
@@ -174,13 +176,12 @@ export function RecentFiles() {
 
     setMyFiles(Array.from(fileMap.values()));
     setSharedFiles(address ? getSharedWithMeFiles(address) : []);
-  }, [address, vaultXIdentity]);
+  }, [address, isVaultXConnected, vaultXIdentity]);
 
   // Fetch real cryptographic audit log
   const fetchActivityLogs = useCallback(async () => {
-    setIsLoadingActivity(true);
     try {
-      const activeAddress = address || vaultXIdentity?.id;
+      const activeAddress = (isVaultXConnected && vaultXIdentity?.id) ? vaultXIdentity.id : address;
       const res = await fetch("/api/payload/activity?limit=50", {
         headers: activeAddress ? { "x-wallet-address": activeAddress } : {},
       });
@@ -193,11 +194,13 @@ export function RecentFiles() {
     } finally {
       setIsLoadingActivity(false);
     }
-  }, [address, vaultXIdentity]);
+  }, [address, isVaultXConnected, vaultXIdentity]);
 
   useEffect(() => {
-    refreshFiles();
-    fetchActivityLogs();
+    const timer = setTimeout(() => {
+      refreshFiles();
+      fetchActivityLogs();
+    }, 0);
     const handleFocus = () => {
       refreshFiles();
       fetchActivityLogs();
@@ -205,6 +208,7 @@ export function RecentFiles() {
     window.addEventListener("focus", handleFocus);
     window.addEventListener("storage", handleFocus);
     return () => {
+      clearTimeout(timer);
       window.removeEventListener("focus", handleFocus);
       window.removeEventListener("storage", handleFocus);
     };
@@ -226,7 +230,7 @@ export function RecentFiles() {
   // ─────────────────────────────────────────────────────────────────────────────
   const handleOpenDecryptModal = (file: StoredEncryptedFile) => {
     setDecryptModalFile(file);
-    setManualKeyInput("");
+    setManualKeyInput(file.keyHex || "");
     setShowKeyInput(false);
     setDecryptModalError(null);
   };

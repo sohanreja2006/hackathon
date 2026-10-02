@@ -36,6 +36,14 @@ export interface StoredEncryptedFile {
   logicalPath?: string;
   uploadStatus?: string;
   integrityStatus?: string;
+  ivHex?: string;
+  chunks?: Array<{
+    index: number;
+    cid: string;
+    hash: string;
+    iv?: string;
+    size?: number;
+  }>;
 }
 
 export interface SharedFileRecord {

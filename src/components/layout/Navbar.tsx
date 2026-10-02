@@ -39,7 +39,7 @@ export function Navbar() {
         {/* SecureVault Logo */}
         <Link
           href="/"
-          className="group flex items-center gap-2.5 transition-transform duration-200 active:scale-95"
+          className="group flex shrink-0 items-center gap-2.5 transition-transform duration-200 active:scale-95"
         >
           <div className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#2563EB] to-[#1D4ED8] text-white shadow-md shadow-blue-500/20">
             <Shield className="h-5 w-5 fill-white/20" />
@@ -51,7 +51,7 @@ export function Navbar() {
         </Link>
 
         {/* Desktop Navigation Links */}
-        <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600">
+        <nav className="hidden lg:flex items-center gap-4 xl:gap-6 text-xs lg:text-sm font-medium text-slate-600">
           {navLinks.map((link) => {
             const isActive = pathname === link.href;
             return (
@@ -73,12 +73,12 @@ export function Navbar() {
         <div className="hidden sm:flex items-center gap-3">
           {/* If Connected & Authenticated: Show pills like Screen 4 */}
           {((isVxConnected && !!identity) || isConnected) && activeAddress ? (
-            <div className="flex items-center gap-2">
-              {/* Address Pill */}
+            <div className="flex items-center gap-2 shrink-0">
+              {/* Address Pill (shown on xl screens; on smaller screens WalletConnectButton shows address) */}
               <button
                 onClick={handleCopy}
                 type="button"
-                className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-mono font-medium text-slate-700 hover:bg-slate-100 transition-colors"
+                className="hidden xl:inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-mono font-medium text-slate-700 hover:bg-slate-100 transition-colors"
                 title="Click to copy address"
               >
                 <span className="text-sm">{isVxConnected ? "🔒" : "🦊"}</span>
@@ -87,7 +87,7 @@ export function Navbar() {
               </button>
 
               {/* Network Pill */}
-              <div className="inline-flex items-center gap-1 rounded-full border border-purple-200 bg-purple-50 px-2.5 py-1 text-xs font-medium text-purple-700">
+              <div className="hidden lg:inline-flex items-center gap-1 rounded-full border border-purple-200 bg-purple-50 px-2.5 py-1 text-xs font-medium text-purple-700">
                 <span className="h-1.5 w-1.5 rounded-full bg-purple-500" />
                 <span>{isVxConnected ? "Local Vault" : (chainName || "Sepolia")}</span>
               </div>

@@ -608,7 +608,7 @@ export const payloadStore = {
         chunkSize: mc.size || 8388608,
         encryptedSize: mc.size || 8388608,
         iv: mc.iv || "",
-        hash: mc.hash || (mc as any).sha256 || "",
+        hash: mc.hash || (mc as { sha256?: string }).sha256 || "",
         cid: mc.cid,
         status: "uploaded",
         uploadedAt: share.createdAt,
@@ -616,8 +616,9 @@ export const payloadStore = {
     }
 
     // Resilient fallback: If still no chunks, but share has manifestCID or cid:
-    if ((!chunks || chunks.length === 0) && (share.manifestCID || (share as any).cid)) {
-      const fallbackCid = share.manifestCID || (share as any).cid;
+    const shareCid = (share as { cid?: string }).cid;
+    if ((!chunks || chunks.length === 0) && (share.manifestCID || shareCid)) {
+      const fallbackCid = share.manifestCID || shareCid || "";
       chunks = [
         {
           id: `${share.fileId}_chunk_0`,

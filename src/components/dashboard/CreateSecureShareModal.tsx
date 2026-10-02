@@ -29,7 +29,7 @@ import {
 } from "@/lib/payloadClient";
 import { StoredEncryptedFile } from "@/lib/fileStorage";
 import { PayloadShare } from "@/payload/types";
-import { createKeyEnvelope, createQuickShareEnvelope, deriveDeterministicIdentity } from "@/lib/e2ee";
+import { createKeyEnvelope, createQuickShareEnvelope, deriveDeterministicIdentity, KeyAgreementMetadata } from "@/lib/e2ee";
 import { SecurityVerificationModal } from "./SecurityVerificationModal";
 
 interface CreateSecureShareModalProps {
@@ -87,7 +87,7 @@ export function CreateSecureShareModal({
   // Load registered users on modal open
   useEffect(() => {
     if (isOpen) {
-      setOwlState("file_selected");
+      setTimeout(() => setOwlState("file_selected"), 0);
       listRegisteredUsersApi().then((users) => {
         setRegisteredUsers(users);
       });
@@ -98,8 +98,10 @@ export function CreateSecureShareModal({
   useEffect(() => {
     const trimmed = recipientInput.trim().toLowerCase();
     if (!trimmed || trimmed.length < 10) {
-      setRecipientProfile(null);
-      setRecipientError(null);
+      setTimeout(() => {
+        setRecipientProfile(null);
+        setRecipientError(null);
+      }, 0);
       return;
     }
 
@@ -166,7 +168,7 @@ export function CreateSecureShareModal({
       const effectiveOwner = vaultXId || file.ownerAddress || undefined;
 
       let encryptedFileKey: string | undefined = undefined;
-      let keyAgreementMetadata: any = undefined;
+      let keyAgreementMetadata: KeyAgreementMetadata | undefined = undefined;
       let quickEnvelopeStr: string | undefined = undefined;
       let generatedSecretHex: string | null = null;
 

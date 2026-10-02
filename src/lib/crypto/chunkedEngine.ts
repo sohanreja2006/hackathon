@@ -26,6 +26,8 @@ const MANIFEST_VERSION = 2;
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { buildHeader } from "../crypto";
+
 export interface ChunkEncryptionResult {
   chunkIndex: number;
   plaintextSize: number;
@@ -150,9 +152,9 @@ function buildAAD(fileId: string, chunkIndex: number, version: number = MANIFEST
 // SHA-256 Integrity
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Compute SHA-256 hash of an ArrayBuffer, returns hex string */
-export async function computeSha256(data: ArrayBuffer): Promise<string> {
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+/** Compute SHA-256 hash of an ArrayBuffer or Uint8Array, returns hex string */
+export async function computeSha256(data: BufferSource | ArrayBuffer): Promise<string> {
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data as unknown as BufferSource);
   return bytesToHex(new Uint8Array(hashBuffer));
 }
 
@@ -221,29 +223,41 @@ export async function encryptFileChunked(
     // Generate UNIQUE IV for this chunk (CRITICAL: never reuse IV with same key)
     const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH));
 
-    // Build AAD to bind ciphertext to its context
-    const aad = buildAAD(fileId, i);
+    // Build AAD for multi-chunk file integrity binding
+    const aad = totalChunks > 1 ? buildAAD(fileId, i) : undefined;
 
     // AES-256-GCM authenticated encryption
+    const encryptParams: AesGcmParams = {
+      name: "AES-GCM",
+      iv: iv as unknown as BufferSource,
+    };
+    if (aad) {
+      encryptParams.additionalData = aad as unknown as BufferSource;
+    }
+
     const ciphertext = await crypto.subtle.encrypt(
-      {
-        name: "AES-GCM",
-        iv: iv as unknown as BufferSource,
-        additionalData: aad as unknown as BufferSource,
-      },
+      encryptParams,
       key,
       plaintext
     );
 
-    // Compute SHA-256 integrity hash of the encrypted chunk
-    const sha256 = await computeSha256(ciphertext);
+    // Build standard CYBER-10 binary header:
+    // [MAGIC: "CYBR"][VERSION: 1][IV: 12B][nameLen: 4B][name][mimeLen: 4B][mime][ciphertext + 16B auth tag]
+    const chunkName = totalChunks === 1 ? file.name : `${file.name}.chunk${i}.cyber10enc`;
+    const header = buildHeader(iv, chunkName, file.type || "application/octet-stream");
+    const bundle = new Uint8Array(header.length + ciphertext.byteLength);
+    bundle.set(header, 0);
+    bundle.set(new Uint8Array(ciphertext), header.length);
 
-    const encryptedBlob = new Blob([ciphertext], { type: "application/octet-stream" });
+    // Compute SHA-256 integrity hash of the chunk bundle
+    const sha256 = await computeSha256(bundle);
+
+    const encryptedBlob = new Blob([bundle], { type: "application/octet-stream" });
 
     chunks.push({
       chunkIndex: i,
       plaintextSize: end - start,
-      encryptedSize: ciphertext.byteLength,
+      encryptedSize: bundle.byteLength,
       iv: bytesToHex(iv),
       sha256,
       encryptedBlob,
@@ -330,7 +344,6 @@ export async function verifyAndDecryptChunk(
 
   // Step 2: Import key and decrypt with AES-GCM (which also verifies the 128-bit auth tag)
   const key = await importKeyHex(keyHex);
-  const iv = hexToBytes(ivHex);
 
   const candidateIds = Array.from(new Set([fileId, ...candidateFileIds].filter(Boolean)));
   const aadsToTry: (Uint8Array | undefined)[] = [];
@@ -344,13 +357,34 @@ export async function verifyAndDecryptChunk(
   // Fallback: No AAD (undefined) - for single-file upload or legacy encrypted chunks
   aadsToTry.push(undefined);
 
+  // Check if encryptedData contains the CYBER-10 binary header
+  const u8 = new Uint8Array(encryptedData);
+  const isCybr = u8.length > 24 && u8[0] === 0x43 && u8[1] === 0x59 && u8[2] === 0x42 && u8[3] === 0x52;
+
+  let activeIv: Uint8Array;
+  let ciphertextToDecrypt: Uint8Array;
+
+  if (isCybr) {
+    let pos = 5; // 4 magic + 1 version
+    activeIv = new Uint8Array(u8.slice(pos, pos + 12));
+    pos += 12;
+    const nameLen = new DataView(u8.buffer, u8.byteOffset).getUint32(pos, false);
+    pos += 4 + nameLen;
+    const mimeLen = new DataView(u8.buffer, u8.byteOffset).getUint32(pos, false);
+    pos += 4 + mimeLen;
+    ciphertextToDecrypt = new Uint8Array(u8.slice(pos));
+  } else {
+    activeIv = ivHex ? hexToBytes(ivHex) : new Uint8Array(12);
+    ciphertextToDecrypt = u8;
+  }
+
   let plaintext: ArrayBuffer | null = null;
 
   for (const aad of aadsToTry) {
     try {
       const decryptParams: AesGcmParams = {
         name: "AES-GCM",
-        iv: iv as unknown as BufferSource,
+        iv: activeIv as unknown as BufferSource,
       };
       if (aad) {
         decryptParams.additionalData = aad as unknown as BufferSource;
@@ -359,7 +393,7 @@ export async function verifyAndDecryptChunk(
       plaintext = await crypto.subtle.decrypt(
         decryptParams,
         key,
-        encryptedData
+        ciphertextToDecrypt as unknown as BufferSource
       );
       if (plaintext) {
         break; // Successfully verified GCM auth tag and decrypted!
@@ -369,27 +403,16 @@ export async function verifyAndDecryptChunk(
     }
   }
 
-  // Fallback: Check if the buffer is a .cyber10enc bundle with embedded header
-  if (!plaintext && encryptedData.byteLength > 24) {
+  // Fallback for raw AES-GCM without header if iv was not in hex or tried directly
+  if (!plaintext && !isCybr && u8.length > 28) {
     try {
-      const u8 = new Uint8Array(encryptedData);
-      // "CYBR" magic check (0x43, 0x59, 0x42, 0x52)
-      if (u8[0] === 0x43 && u8[1] === 0x59 && u8[2] === 0x42 && u8[3] === 0x52) {
-        let pos = 5; // 4 magic + 1 version
-        const headerIv = u8.slice(pos, pos + 12);
-        pos += 12;
-        const nameLen = new DataView(u8.buffer, u8.byteOffset).getUint32(pos, false);
-        pos += 4 + nameLen;
-        const mimeLen = new DataView(u8.buffer, u8.byteOffset).getUint32(pos, false);
-        pos += 4 + mimeLen;
-        const ct = u8.slice(pos);
-
-        plaintext = await crypto.subtle.decrypt(
-          { name: "AES-GCM", iv: headerIv as unknown as BufferSource },
-          key,
-          ct
-        );
-      }
+      const rawIv = u8.slice(0, 12);
+      const rawCt = u8.slice(12);
+      plaintext = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv: rawIv as unknown as BufferSource },
+        key,
+        rawCt as unknown as BufferSource
+      );
     } catch {
       // ignore
     }
@@ -427,13 +450,13 @@ export async function decryptFileFromManifest(
   const decryptedParts: ArrayBuffer[] = [];
 
   for (let i = 0; i < totalChunks; i++) {
-    const chunkMeta = chunks.find((c) => (c.index ?? (c as any).chunkIndex) === i);
+    const chunkMeta = chunks.find((c) => (c.index ?? (c as { chunkIndex?: number }).chunkIndex) === i);
     if (!chunkMeta) {
       throw new Error(`Missing chunk metadata for index ${i}. Manifest may be corrupted.`);
     }
 
-    const cid = chunkMeta.cid || (chunkMeta as any).ipfsCID;
-    const sha256 = chunkMeta.sha256 || (chunkMeta as any).hash;
+    const cid = chunkMeta.cid || (chunkMeta as { ipfsCID?: string }).ipfsCID || "";
+    const sha256 = chunkMeta.sha256 || (chunkMeta as { hash?: string }).hash || "";
     const iv = chunkMeta.iv;
 
     // Step 1: Fetch encrypted chunk from IPFS
@@ -465,6 +488,12 @@ export async function decryptFileFromManifest(
       message: `Decrypting chunk ${i + 1} with AES-256-GCM...`,
     });
 
+    const candidateManifestIds = [
+      manifest.fileId,
+      (manifest as { id?: string }).id,
+      (manifest as { manifestCID?: string }).manifestCID,
+    ].filter((x): x is string => typeof x === "string" && Boolean(x));
+
     const plaintext = await verifyAndDecryptChunk(
       encryptedData,
       keyHex,
@@ -472,7 +501,7 @@ export async function decryptFileFromManifest(
       sha256,
       iv,
       fileId,
-      [manifest.fileId, (manifest as any).id, (manifest as any).manifestCID].filter(Boolean)
+      candidateManifestIds
     );
 
     decryptedParts.push(plaintext);

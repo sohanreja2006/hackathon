@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useAccount } from "wagmi";
 import {
   X,
@@ -110,21 +110,7 @@ export function ReceiveSecureFileModal({
   // Dynamic Owl State
   const [owlState, setOwlState] = useState<OwlState>("idle");
 
-  // Burn-on-read timer effect
-  useEffect(() => {
-    if (burnRemainingSeconds !== null && burnRemainingSeconds > 0) {
-      burnTimerRef.current = setTimeout(() => {
-        setBurnRemainingSeconds((prev) => (prev !== null ? prev - 1 : null));
-      }, 1000);
-    } else if (burnRemainingSeconds === 0) {
-      triggerBurn();
-    }
-    return () => {
-      if (burnTimerRef.current) clearTimeout(burnTimerRef.current);
-    };
-  }, [burnRemainingSeconds]);
-
-  const triggerBurn = async () => {
+  const triggerBurn = useCallback(async () => {
     if (foundShare) {
       try {
         await burnSecureShareApi(foundShare.shareCode);
@@ -142,7 +128,23 @@ export function ReceiveSecureFileModal({
     setPreviewData(null);
     setIsBurned(true);
     setOwlState("idle");
-  };
+  }, [foundShare, downloadReady]);
+
+  // Burn-on-read timer effect
+  useEffect(() => {
+    if (burnRemainingSeconds !== null && burnRemainingSeconds > 0) {
+      burnTimerRef.current = setTimeout(() => {
+        setBurnRemainingSeconds((prev) => (prev !== null ? prev - 1 : null));
+      }, 1000);
+    } else if (burnRemainingSeconds === 0) {
+      setTimeout(() => {
+        triggerBurn();
+      }, 0);
+    }
+    return () => {
+      if (burnTimerRef.current) clearTimeout(burnTimerRef.current);
+    };
+  }, [burnRemainingSeconds, triggerBurn]);
 
   const formatCountdown = (secs: number) => {
     const m = Math.floor(secs / 60);
@@ -194,21 +196,36 @@ export function ReceiveSecureFileModal({
     }
   }, [foundShare]);
 
-  useEffect(() => {
-    if (initialCode) {
-      const extractedSecret = extractSecretFromText(initialCode);
-      if (extractedSecret) {
-        setQuickShareSecret(extractedSecret);
-      }
-      const formatted = formatShareCodeInput(initialCode);
-      setShareCode(formatted);
-      if (isValidShareCodeFormat(formatted)) {
-        handleLookup(formatted);
-      }
+  const handleLookup = useCallback(async (codeToLookup?: string) => {
+    const target = codeToLookup || shareCode;
+    if (!isValidShareCodeFormat(target)) {
+      setLookupError("Please enter a valid format: SV-XXXX-XXXX-XXXX");
+      setOwlState("error");
+      return;
     }
-  }, [initialCode]);
 
-  if (!isOpen) return null;
+    try {
+      setIsLookingUp(true);
+      setLookupError(null);
+      setOwlState("verifying");
+
+      const res = await lookupSecureShare(target);
+      if (!res.success || !res.share) {
+        setLookupError(res.error || "Share not found. Check the code and try again.");
+        setOwlState("error");
+        setFoundShare(null);
+        return;
+      }
+
+      setFoundShare(res.share);
+      setOwlState("idle");
+    } catch {
+      setLookupError("Failed to lookup share code. Please try again.");
+      setOwlState("error");
+    } finally {
+      setIsLookingUp(false);
+    }
+  }, []);
 
   const handleCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawVal = e.target.value;
@@ -227,35 +244,21 @@ export function ReceiveSecureFileModal({
     }
   };
 
-  const handleLookup = async (codeToLookup = shareCode) => {
-    if (!isValidShareCodeFormat(codeToLookup)) {
-      setLookupError("Please enter a valid format: SV-XXXX-XXXX-XXXX");
-      setOwlState("error");
-      return;
+  useEffect(() => {
+    if (initialCode) {
+      const extractedSecret = extractSecretFromText(initialCode);
+      const formatted = formatShareCodeInput(initialCode);
+      setTimeout(() => {
+        if (extractedSecret) {
+          setQuickShareSecret(extractedSecret);
+        }
+        setShareCode(formatted);
+        if (isValidShareCodeFormat(formatted)) {
+          handleLookup(formatted);
+        }
+      }, 0);
     }
-
-    try {
-      setIsLookingUp(true);
-      setLookupError(null);
-      setOwlState("verifying");
-
-      const res = await lookupSecureShare(codeToLookup);
-      if (!res.success || !res.share) {
-        setLookupError(res.error || "Share not found. Check the code and try again.");
-        setOwlState("error");
-        setFoundShare(null);
-        return;
-      }
-
-      setFoundShare(res.share);
-      setOwlState("idle");
-    } catch {
-      setLookupError("Failed to lookup share code. Please try again.");
-      setOwlState("error");
-    } finally {
-      setIsLookingUp(false);
-    }
-  };
+  }, [initialCode, handleLookup]);
 
   const isRecipientAuthorized = () => {
     if (!foundShare) return false;
@@ -394,9 +397,9 @@ export function ReceiveSecureFileModal({
       // 3. Chunks & Integrity Verification
       let targetChunks = chunks && chunks.length > 0 ? chunks : manifest?.chunks || [];
 
-      // If targetChunks is empty, resolve from manifestCID or IPFS or fallback
-      if ((!targetChunks || targetChunks.length === 0) && (foundShare.manifestCID || (file as any)?.manifestCID)) {
-        const manifestCid = foundShare.manifestCID || (file as any)?.manifestCID;
+      const fileManifestCid = (file as { manifestCID?: string } | null)?.manifestCID;
+      if ((!targetChunks || targetChunks.length === 0) && (foundShare.manifestCID || fileManifestCid)) {
+        const manifestCid = foundShare.manifestCID || fileManifestCid || "";
         setProgressMessage("Resolving file manifest from IPFS...");
         try {
           const rawManifest = await fetchFromIpfs(manifestCid);
@@ -451,13 +454,13 @@ export function ReceiveSecureFileModal({
       const candidateIds = Array.from(
         new Set(
           [
-            (file as any)?.fileId,
-            (file as any)?.id,
-            (foundShare as any)?.fileId,
+            (file as { fileId?: string } | null)?.fileId,
+            file?.id,
+            (foundShare as { fileId?: string } | null)?.fileId,
             manifest?.fileId,
-            (manifest as any)?.id,
+            (manifest as { id?: string } | null)?.id,
             foundShare?.manifestCID,
-            (file as any)?.manifestCID,
+            (file as { manifestCID?: string } | null)?.manifestCID,
             foundShare?.shareCode,
             file?.fileName,
             foundShare?.fileName,
@@ -1020,7 +1023,7 @@ export function ReceiveSecureFileModal({
               </button>
               <button
                 type="button"
-                onClick={() => handleLookup()}
+                onClick={() => handleLookup(shareCode)}
                 disabled={!isValidShareCodeFormat(shareCode) || isLookingUp}
                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs shadow-xs transition-all disabled:opacity-50"
               >

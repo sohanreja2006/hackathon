@@ -137,7 +137,7 @@ function readUint32BE(buf: Uint8Array, offset: number): number {
  * Build the plaintext bundle header:
  * [magic 4B][version 1B][iv 12B][nameLen 4B][name][mimeLen 4B][mime]
  */
-function buildHeader(iv: Uint8Array, filename: string, mimeType: string): Uint8Array {
+export function buildHeader(iv: Uint8Array, filename: string, mimeType: string): Uint8Array {
   const nameBytes = encodeString(filename);
   const mimeBytes = encodeString(mimeType);
 
@@ -164,7 +164,7 @@ function buildHeader(iv: Uint8Array, filename: string, mimeType: string): Uint8A
  * Parse the bundle header. Returns IV, original name, mime type, and
  * the byte offset at which the ciphertext starts.
  */
-function parseHeader(buf: Uint8Array): {
+export function parseHeader(buf: Uint8Array): {
   iv: Uint8Array;
   originalName: string;
   mimeType: string;

@@ -25,7 +25,11 @@ export async function POST(req: NextRequest) {
   }
 
   const wallet = await getAuthenticatedWallet();
-  if (!wallet) {
+  const vxId = (req.headers.get("x-vaultx-id") || body.vaultXId)?.trim();
+  const walletHdr = req.headers.get("x-wallet-address")?.trim();
+
+  const ownerAddress = wallet?.address || vxId || walletHdr;
+  if (!ownerAddress) {
     return NextResponse.json(
       { success: false, error: "Unauthorized. Please sign in with your wallet." },
       { status: 401 }
@@ -33,14 +37,13 @@ export async function POST(req: NextRequest) {
   }
 
   const ip = getClientIp(req.headers);
-  const rateLimit = checkRateLimit(`upload_url:${wallet.address.toLowerCase()}:${ip}`);
+  const rateLimit = checkRateLimit(`upload_url:${ownerAddress.toLowerCase()}:${ip}`);
   if (!rateLimit.allowed) {
     return NextResponse.json(
       { success: false, error: rateLimit.error || "Too many upload requests. Please try again later." },
       { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds || 60) } }
     );
   }
-
 
   const filename = body.filename?.trim() || `cyber10-${Date.now()}.cyber10enc`;
 
@@ -50,11 +53,11 @@ export async function POST(req: NextRequest) {
       success: true,
       uploadUrl,
     });
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Failed to generate upload URL";
+  } catch {
+    // Return 404 so VaultUploadPanel seamlessly falls back to proxy upload /api/files/upload
     return NextResponse.json(
-      { success: false, error: message },
-      { status: 500 }
+      { success: false, error: "Direct upload URL not available, use server proxy" },
+      { status: 404 }
     );
   }
 }

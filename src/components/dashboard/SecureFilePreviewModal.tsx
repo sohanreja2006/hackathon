@@ -90,16 +90,18 @@ export function SecureFilePreviewModal({
   // Initialize sandboxed Blob Object URL
   useEffect(() => {
     if (isOpen && previewData?.blob) {
-      setIsMemoryPurged(false);
-      setZoomLevel(1);
+      setTimeout(() => {
+        setIsMemoryPurged(false);
+        setZoomLevel(1);
+      }, 0);
 
       // Create sandboxed in-memory URL
       const url = URL.createObjectURL(previewData.blob);
-      setObjectUrl(url);
+      setTimeout(() => setObjectUrl(url), 0);
 
       // Read text content if applicable
       if (isText) {
-        setIsReadingText(true);
+        setTimeout(() => setIsReadingText(true), 0);
         previewData.blob
           .text()
           .then((text) => {
@@ -113,7 +115,7 @@ export function SecureFilePreviewModal({
             setIsReadingText(false);
           });
       } else {
-        setTextContent(null);
+        setTimeout(() => setTextContent(null), 0);
       }
 
       return () => {
@@ -121,8 +123,10 @@ export function SecureFilePreviewModal({
         URL.revokeObjectURL(url);
       };
     } else {
-      setObjectUrl(null);
-      setTextContent(null);
+      setTimeout(() => {
+        setObjectUrl(null);
+        setTextContent(null);
+      }, 0);
     }
   }, [isOpen, previewData]);
 

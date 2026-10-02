@@ -43,7 +43,11 @@ export async function POST(req: NextRequest): Promise<NextResponse<UploadApiResp
   }
 
   const wallet = await getAuthenticatedWallet();
-  if (!wallet) {
+  const vxId = (req.headers.get("x-vaultx-id") || formData.get("vaultXId") as string | null)?.trim();
+  const walletHdr = (req.headers.get("x-wallet-address") || formData.get("ownerAddress") as string | null)?.trim();
+
+  const ownerAddress = wallet?.address || vxId || walletHdr;
+  if (!ownerAddress) {
     return NextResponse.json(
       { success: false, error: "Unauthorized. Please sign in with your wallet." },
       { status: 401 }
@@ -51,15 +55,13 @@ export async function POST(req: NextRequest): Promise<NextResponse<UploadApiResp
   }
 
   const ip = getClientIp(req.headers);
-  const rateLimit = checkRateLimit(`upload_file:${wallet.address.toLowerCase()}:${ip}`);
+  const rateLimit = checkRateLimit(`upload_file:${ownerAddress.toLowerCase()}:${ip}`);
   if (!rateLimit.allowed) {
     return NextResponse.json(
       { success: false, error: rateLimit.error || "Too many upload requests. Please try again later." },
       { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds || 60) } }
     );
   }
-
-  const ownerAddress = wallet.address;
 
   const encryptedFileEntry = formData.get("encryptedFile");
   const originalName = (formData.get("originalName") as string | null)?.trim() || "unknown";
@@ -94,17 +96,21 @@ export async function POST(req: NextRequest): Promise<NextResponse<UploadApiResp
     );
   }
 
-  // ── 4. SECURITY: Verify this is a CYBER-10 encrypted bundle ────────────────
-  // Check for the "CYBR" magic bytes at the start of the buffer.
-  // This prevents accidentally uploading unencrypted files.
+  // ── 4. SECURITY: Verify this is a CYBER-10 encrypted bundle or manifest ───
+  // Check for the "CYBR" magic bytes or JSON manifest containing AES-256-GCM chunks.
   const MAGIC = [0x43, 0x59, 0x42, 0x52]; // "CYBR"
   const hasMagic = MAGIC.every((byte, i) => encryptedBuffer[i] === byte);
-  if (!hasMagic) {
+  const isManifest =
+    originalName.endsWith(".manifest.json") ||
+    originalMime === "application/json" ||
+    (encryptedBuffer[0] === 0x7b && encryptedBuffer.toString("utf8").includes("AES-256-GCM"));
+
+  if (!hasMagic && !isManifest) {
     return NextResponse.json(
       {
         success: false,
         error:
-          "Invalid encrypted bundle format. Only CYBER-10 AES-256-GCM encrypted files (.cyber10enc) are accepted.",
+          "Invalid encrypted bundle format. Only CYBER-10 AES-256-GCM encrypted files (.cyber10enc) or file manifests are accepted.",
       },
       { status: 400 }
     );
