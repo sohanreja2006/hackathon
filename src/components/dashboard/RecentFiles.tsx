@@ -35,10 +35,11 @@ import { isAddress } from "viem";
 import { getIpfsUrl } from "@/lib/ipfs/gateway";
 import { useVaultXWallet } from "@/context/VaultXWalletContext";
 import { OwlCompanion } from "@/components/ui/OwlCompanion";
-import { fetchPayloadFiles, deletePayloadFile } from "@/lib/payloadClient";
+import { fetchPayloadFiles, deletePayloadFile, fetchPendingApprovalsApi } from "@/lib/payloadClient";
 import { FileDetailsModal } from "./FileDetailsModal";
 import { CreateSecureShareModal } from "./CreateSecureShareModal";
 import { ReceiveSecureFileModal } from "./ReceiveSecureFileModal";
+import { PendingApprovalsModal } from "./PendingApprovalsModal";
 import { SecureFilePreviewModal, SecurePreviewData } from "./SecureFilePreviewModal";
 import { PayloadActivityLog } from "@/payload/types";
 
@@ -94,6 +95,27 @@ export function RecentFiles() {
   // Secure Share Code State
   const [secureShareFile, setSecureShareFile] = useState<StoredEncryptedFile | null>(null);
   const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false);
+  const [isApprovalsModalOpen, setIsApprovalsModalOpen] = useState(false);
+  const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
+
+  // Poll for pending access requests for the logged-in owner
+  useEffect(() => {
+    if (!ownerKey) return;
+    const checkApprovals = async () => {
+      try {
+        const res = await fetchPendingApprovalsApi(ownerKey);
+        if (res.success && Array.isArray(res.requests)) {
+          const pending = res.requests.filter((r: any) => r.status === "pending").length;
+          setPendingApprovalsCount(pending);
+        }
+      } catch {
+        // silent
+      }
+    };
+    checkApprovals();
+    const interval = setInterval(checkApprovals, 5000);
+    return () => clearInterval(interval);
+  }, [ownerKey]);
 
   // Delete Confirmation Modal State
   const [fileToDelete, setFileToDelete] = useState<StoredEncryptedFile | null>(null);
@@ -518,10 +540,28 @@ export function RecentFiles() {
           <button
             type="button"
             onClick={() => setIsReceiveModalOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs transition-colors shrink-0"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs transition-colors shrink-0 cursor-pointer"
           >
             <FileDown className="h-3.5 w-3.5 text-[#2563EB]" />
             <span>Receive File</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsApprovalsModalOpen(true)}
+            className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border text-xs font-semibold shadow-2xs transition-all shrink-0 cursor-pointer ${
+              pendingApprovalsCount > 0
+                ? "bg-amber-500 hover:bg-amber-600 text-white border-amber-500 shadow-amber-500/20 shadow-md animate-pulse"
+                : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
+            }`}
+          >
+            <ShieldCheck className={`h-3.5 w-3.5 ${pendingApprovalsCount > 0 ? "text-white" : "text-[#2563EB]"}`} />
+            <span>Approvals</span>
+            {pendingApprovalsCount > 0 && (
+              <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-black bg-white text-amber-600">
+                {pendingApprovalsCount}
+              </span>
+            )}
           </button>
 
           <Link
@@ -1390,6 +1430,14 @@ export function RecentFiles() {
       <ReceiveSecureFileModal
         isOpen={isReceiveModalOpen}
         onClose={() => setIsReceiveModalOpen(false)}
+      />
+
+      {/* Pending Approvals Modal */}
+      <PendingApprovalsModal
+        isOpen={isApprovalsModalOpen}
+        onClose={() => setIsApprovalsModalOpen(false)}
+        vaultXId={ownerKey}
+        onRequestCountChange={setPendingApprovalsCount}
       />
 
       {/* In-Browser Zero-Disk Secure Preview Modal */}

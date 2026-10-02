@@ -19,12 +19,21 @@ import {
   AlertTriangle,
   Flame,
   Eye,
+  CheckCircle2,
+  XCircle,
+  Clock,
 } from "lucide-react";
 import { formatBytes, downloadBlob, decryptFile } from "@/lib/crypto";
 import { computeSha256, verifyAndDecryptChunk } from "@/lib/crypto/chunkedEngine";
 import { OwlCompanion, OwlState } from "@/components/ui/OwlCompanion";
 import { formatShareCodeInput, isValidShareCodeFormat, extractSecretFromText } from "@/lib/shareCode";
-import { lookupSecureShare, accessSecureShare, burnSecureShareApi } from "@/lib/payloadClient";
+import {
+  lookupSecureShare,
+  accessSecureShare,
+  burnSecureShareApi,
+  requestShareAccessApi,
+  pollShareAccessRequestApi,
+} from "@/lib/payloadClient";
 import { getIpfsUrl, fetchFromIpfs } from "@/lib/ipfs/gateway";
 import { getAllVaultFiles } from "@/lib/fileStorage";
 import {
@@ -76,7 +85,14 @@ export function ReceiveSecureFileModal({
     hasEncryptedKey?: boolean;
     burnAfterReading?: boolean;
     burnDurationSeconds?: number;
+    requireApproval?: boolean;
   } | null>(null);
+
+  // Owner Approval Gate State
+  const [approvalStatus, setApprovalStatus] = useState<"none" | "requesting" | "pending" | "approved" | "denied">("none");
+  const [approvalToken, setApprovalToken] = useState<string | null>(null);
+  const [requesterNote, setRequesterNote] = useState("");
+  const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
 
   // Quick share secret if applicable
   const [quickShareSecret, setQuickShareSecret] = useState("");
@@ -268,8 +284,36 @@ export function ReceiveSecureFileModal({
     return activeAddress.toLowerCase() === foundShare.recipientUserId.toLowerCase();
   };
 
-  const handleStartDecryptionAndDownload = async () => {
+  const handleRequestAccess = async () => {
     if (!foundShare) return;
+    setApprovalStatus("requesting");
+    setLookupError(null);
+    setOwlState("verifying");
+    try {
+      const res = await requestShareAccessApi(
+        foundShare.shareCode,
+        activeAddress || undefined,
+        requesterNote.trim() || undefined
+      );
+      if (res.success && res.requestId) {
+        setActiveRequestId(res.requestId);
+        setApprovalStatus("pending");
+      } else {
+        setApprovalStatus("none");
+        setLookupError(res.error || "Failed to submit access request.");
+        setOwlState("error");
+      }
+    } catch {
+      setApprovalStatus("none");
+      setLookupError("Failed to submit access request.");
+      setOwlState("error");
+    }
+  };
+
+  const handleStartDecryptionAndDownload = async (overrideApprovalToken?: string) => {
+    if (!foundShare) return;
+
+    const effectiveToken = overrideApprovalToken || approvalToken || undefined;
 
     if (foundShare.passwordProtected && !passwordInput.trim()) {
       setPasswordError("Password is required to access this file.");
@@ -307,10 +351,24 @@ export function ReceiveSecureFileModal({
       const accessRes = await accessSecureShare(
         foundShare.shareCode,
         activeAddress || undefined,
-        passwordInput.trim() || undefined
+        passwordInput.trim() || undefined,
+        effectiveToken
       );
 
       if (!accessRes.success) {
+        if (accessRes.status === "approval-required") {
+          setApprovalStatus("none");
+          setLookupError("Sender approval is required to access this file. Please submit an access request below.");
+          setOwlState("idle");
+          return;
+        }
+        if (accessRes.status === "approval-invalid") {
+          setApprovalStatus("none");
+          setApprovalToken(null);
+          setLookupError("Access approval expired or was denied by the sender. Please submit a new request.");
+          setOwlState("error");
+          return;
+        }
         if (accessRes.error?.toLowerCase().includes("password")) {
           setPasswordError(accessRes.error);
           setOwlState("error");
@@ -574,6 +632,38 @@ export function ReceiveSecureFileModal({
     }
   };
 
+  // Poll for approval status while pending
+  useEffect(() => {
+    if (approvalStatus !== "pending" || !activeRequestId) return;
+
+    let isMounted = true;
+    const interval = setInterval(async () => {
+      try {
+        const res = await pollShareAccessRequestApi(activeRequestId);
+        if (!isMounted) return;
+        if (res.success) {
+          if (res.status === "approved" && res.accessToken) {
+            setApprovalStatus("approved");
+            setApprovalToken(res.accessToken);
+            setOwlState("success");
+            // Automatically start decryption once approved!
+            handleStartDecryptionAndDownload(res.accessToken);
+          } else if (res.status === "denied") {
+            setApprovalStatus("denied");
+            setOwlState("error");
+          }
+        }
+      } catch (err) {
+        console.warn("Polling access request failed:", err);
+      }
+    }, 2500);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [approvalStatus, activeRequestId]);
+
   const handleReset = () => {
     if (burnTimerRef.current) clearTimeout(burnTimerRef.current);
     if (downloadReady?.url) {
@@ -586,6 +676,10 @@ export function ReceiveSecureFileModal({
     setPasswordError(null);
     setQuickShareSecret("");
     setSecretError(null);
+    setApprovalStatus("none");
+    setApprovalToken(null);
+    setRequesterNote("");
+    setActiveRequestId(null);
     setDownloadReady(null);
     setDecryptedBlob(null);
     setPreviewData(null);
@@ -881,6 +975,126 @@ export function ReceiveSecureFileModal({
                     </div>
                   )}
 
+                  {/* Sender Approval Gate Section */}
+                  {foundShare.requireApproval && (
+                    <div className="p-4 rounded-2xl border border-blue-200 bg-gradient-to-b from-blue-50/50 to-white space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
+                          <UserCheck className="h-4 w-4 text-[#2563EB]" />
+                          <span>Owner Approval Gate</span>
+                        </div>
+                        {approvalStatus === "approved" || approvalToken ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                            <CheckCircle2 className="h-3 w-3" /> Approved
+                          </span>
+                        ) : approvalStatus === "pending" ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full animate-pulse">
+                            <Clock className="h-3 w-3" /> Waiting for Owner
+                          </span>
+                        ) : approvalStatus === "denied" ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-100 px-2 py-0.5 rounded-full">
+                            <XCircle className="h-3 w-3" /> Denied
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
+                            Required
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Content based on approval status */}
+                      {approvalStatus === "approved" || approvalToken ? (
+                        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 space-y-1">
+                          <p className="font-bold flex items-center gap-1.5">
+                            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                            Access Verified & Approved by File Owner!
+                          </p>
+                          <p className="text-[11px] text-emerald-700">
+                            The owner authorized your access request. Decryption envelope released.
+                          </p>
+                        </div>
+                      ) : approvalStatus === "pending" ? (
+                        <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-xl text-xs text-amber-900 space-y-2.5">
+                          <div className="flex items-center gap-2">
+                            <div className="relative flex h-3 w-3">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                            </div>
+                            <span className="font-bold text-xs text-amber-900">
+                              Access Request Sent — Awaiting Owner Approval
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-amber-800 leading-relaxed">
+                            The sender has been notified on their dashboard. Please keep this modal open — this page will automatically unlock as soon as the owner approves.
+                          </p>
+                          <div className="flex items-center justify-between pt-1 text-[10px] text-amber-700 font-mono">
+                            <span>Request ID: {activeRequestId?.slice(0, 14)}...</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setApprovalStatus("none");
+                                setActiveRequestId(null);
+                              }}
+                              className="text-amber-800 underline hover:text-amber-950 font-sans font-bold cursor-pointer"
+                            >
+                              Cancel Request
+                            </button>
+                          </div>
+                        </div>
+                      ) : approvalStatus === "denied" ? (
+                        <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 space-y-2">
+                          <div className="flex items-center gap-1.5 font-bold text-rose-900">
+                            <XCircle className="h-4 w-4 text-rose-600" />
+                            Access Denied by File Owner
+                          </div>
+                          <p className="text-[11px] text-rose-700 leading-relaxed">
+                            The sender reviewed your request and chose not to grant access to this file.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => setApprovalStatus("none")}
+                            className="text-xs font-bold text-rose-800 underline hover:text-rose-950 cursor-pointer"
+                          >
+                            Submit Another Request
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-2.5">
+                          <p className="text-xs text-slate-600 leading-relaxed">
+                            The owner of this link requires individual approval on every access. Please submit a request so the sender can verify your identity.
+                          </p>
+                          <div>
+                            <input
+                              type="text"
+                              value={requesterNote}
+                              onChange={(e) => setRequesterNote(e.target.value)}
+                              placeholder="Your name or note for sender (e.g. Alice from Finance)..."
+                              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#2563EB]"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            disabled={approvalStatus === "requesting"}
+                            onClick={handleRequestAccess}
+                            className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#2563EB] border border-blue-200 text-xs font-bold transition-colors disabled:opacity-50 cursor-pointer"
+                          >
+                            {approvalStatus === "requesting" ? (
+                              <>
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                <span>Sending Request...</span>
+                              </>
+                            ) : (
+                              <>
+                                <UserCheck className="h-3.5 w-3.5" />
+                                <span>Send Access Request to Owner</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Live Progress & Integrity Tracker */}
                   {isProcessing && (
                     <div className="p-3.5 rounded-2xl border border-blue-200 bg-blue-50/60 space-y-2 text-xs">
@@ -1049,29 +1263,64 @@ export function ReceiveSecureFileModal({
               >
                 Back
               </button>
-              <button
-                type="button"
-                onClick={handleStartDecryptionAndDownload}
-                disabled={
-                  Boolean(
-                    isProcessing ||
-                    (!foundShare.isQuickShare && foundShare.recipientUserId && !isRecipientAuthorized())
-                  )
-                }
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs shadow-xs transition-all disabled:opacity-50"
-              >
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    <span>Decrypting File...</span>
-                  </>
-                ) : (
-                  <>
-                    <Download className="h-3.5 w-3.5" />
-                    <span>Unlock, Decrypt & Download</span>
-                  </>
-                )}
-              </button>
+              {foundShare.requireApproval && !approvalToken ? (
+                <button
+                  type="button"
+                  onClick={handleRequestAccess}
+                  disabled={
+                    Boolean(
+                      isProcessing ||
+                      approvalStatus === "requesting" ||
+                      approvalStatus === "pending" ||
+                      (!foundShare.isQuickShare && foundShare.recipientUserId && !isRecipientAuthorized())
+                    )
+                  }
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs shadow-xs transition-all disabled:opacity-50 cursor-pointer"
+                >
+                  {approvalStatus === "requesting" ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>Sending Request...</span>
+                    </>
+                  ) : approvalStatus === "pending" ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>Waiting for Owner Approval...</span>
+                    </>
+                  ) : approvalStatus === "denied" ? (
+                    <span>Access Denied by Owner</span>
+                  ) : (
+                    <>
+                      <UserCheck className="h-3.5 w-3.5" />
+                      <span>Request Access from Owner</span>
+                    </>
+                  )}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => handleStartDecryptionAndDownload()}
+                  disabled={
+                    Boolean(
+                      isProcessing ||
+                      (!foundShare.isQuickShare && foundShare.recipientUserId && !isRecipientAuthorized())
+                    )
+                  }
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs shadow-xs transition-all disabled:opacity-50 cursor-pointer"
+                >
+                  {isProcessing ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>Decrypting File...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download className="h-3.5 w-3.5" />
+                      <span>Unlock, Decrypt & Download</span>
+                    </>
+                  )}
+                </button>
+              )}
             </>
           ) : (
             <button

@@ -121,6 +121,7 @@ export const payloadService = {
     oneTime?: boolean;
     burnAfterReading?: boolean;
     burnDurationSeconds?: number;
+    requireApproval?: boolean;
     passwordProtected?: boolean;
     passwordHash?: string;
     manifest?: PayloadManifest | null;

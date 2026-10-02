@@ -235,6 +235,7 @@ export interface CreateSecureShareParams {
   oneTime?: boolean;
   burnAfterReading?: boolean;
   burnDurationSeconds?: number;
+  requireApproval?: boolean;
   passwordProtected?: boolean;
   password?: string;
   manifest?: PayloadManifest | null;
@@ -311,13 +312,14 @@ export async function lookupSecureShare(shareCode: string) {
 export async function accessSecureShare(
   shareCode: string,
   accessorWallet?: string,
-  password?: string
+  password?: string,
+  approvalToken?: string
 ) {
   try {
     const res = await fetch("/api/payload/shares/access", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code: shareCode, accessorWallet, password }),
+      body: JSON.stringify({ code: shareCode, accessorWallet, password, approvalToken }),
     });
     const data = await res.json();
     return data;
@@ -393,4 +395,84 @@ export async function listRegisteredUsersApi(): Promise<Array<{
     return [];
   }
 }
+
+export async function requestShareAccessApi(
+  shareCode: string,
+  requesterAddress?: string,
+  requesterNote?: string
+): Promise<{ success: boolean; requestId?: string; error?: string }> {
+  try {
+    const res = await fetch("/api/payload/shares/request-access", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ shareCode, requesterAddress, requesterNote }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      return { success: false, error: data.error || "Failed to submit access request." };
+    }
+    return { success: true, requestId: data.requestId };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Request failed.";
+    return { success: false, error: msg };
+  }
+}
+
+export async function pollShareAccessRequestApi(
+  requestId: string
+): Promise<{ success: boolean; status?: "pending" | "approved" | "denied"; accessToken?: string; error?: string }> {
+  try {
+    const res = await fetch(`/api/payload/shares/poll-request?requestId=${encodeURIComponent(requestId)}`);
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      return { success: false, error: data.error || "Poll failed." };
+    }
+    return { success: true, status: data.status, accessToken: data.accessToken };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Poll failed.";
+    return { success: false, error: msg };
+  }
+}
+
+export async function fetchPendingApprovalsApi(
+  vaultXId?: string | null
+): Promise<{ success: boolean; requests: any[]; error?: string }> {
+  try {
+    const res = await fetch("/api/payload/shares/pending-approvals", {
+      method: "GET",
+      headers: getAuthHeaders(vaultXId),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      return { success: false, requests: [], error: data.error };
+    }
+    return { success: true, requests: data.requests || [] };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Failed to fetch approvals.";
+    return { success: false, requests: [], error: msg };
+  }
+}
+
+export async function respondToAccessRequestApi(
+  requestId: string,
+  action: "approve" | "deny",
+  vaultXId?: string | null
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await fetch("/api/payload/shares/pending-approvals", {
+      method: "POST",
+      headers: getAuthHeaders(vaultXId),
+      body: JSON.stringify({ requestId, action }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      return { success: false, error: data.error || `Failed to ${action} request.` };
+    }
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : `Failed to ${action} request.`;
+    return { success: false, error: msg };
+  }
+}
+
 

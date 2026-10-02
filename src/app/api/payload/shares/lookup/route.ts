@@ -97,6 +97,7 @@ export async function GET(req: NextRequest) {
       oneTime: share.oneTime,
       burnAfterReading: share.burnAfterReading,
       burnDurationSeconds: share.burnDurationSeconds,
+      requireApproval: Boolean(share.requireApproval),
       recipientUserId: share.recipientUserId,
       recipientPublicKeyFingerprint: share.recipientPublicKeyFingerprint,
       isQuickShare: share.isQuickShare,

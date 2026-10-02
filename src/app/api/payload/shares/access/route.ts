@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPayloadAuth, payloadService } from "@/lib/payload/client";
+import { payloadStore } from "@/lib/payload/store";
 import { formatShareCodeInput } from "@/lib/shareCode";
 import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
 
@@ -93,6 +94,35 @@ export async function POST(req: NextRequest) {
     }
 
     const { share, manifest, chunks } = result;
+
+    // Verify owner approval gate if requireApproval is enabled on the share
+    if (share.requireApproval) {
+      const isOwner = accessorWallet && accessorWallet.toLowerCase() === share.ownerWallet.toLowerCase();
+      if (!isOwner) {
+        const approvalToken = body.approvalToken || body.accessToken;
+        if (!approvalToken) {
+          return NextResponse.json(
+            {
+              success: false,
+              status: "approval-required",
+              error: "Sender approval is required to access this file. Please request access from the owner.",
+            },
+            { status: 403 }
+          );
+        }
+        const accessReq = payloadStore.getAccessRequestByToken(approvalToken);
+        if (!accessReq || accessReq.shareCode !== normalizedCode || accessReq.status !== "approved") {
+          return NextResponse.json(
+            {
+              success: false,
+              status: "approval-invalid",
+              error: "Access approval token is invalid, expired, or was denied by the owner.",
+            },
+            { status: 403 }
+          );
+        }
+      }
+    }
 
     try {
       payloadService.appendActivity(

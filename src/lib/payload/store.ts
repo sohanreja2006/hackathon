@@ -15,6 +15,20 @@ import {
 import { generateShareCode, hashSharePassword } from "@/lib/shareCode";
 import { recordActivityLog } from "./db";
 
+export interface AccessRequest {
+  id: string;
+  shareCode: string;
+  fileId: string;
+  fileName: string;
+  ownerWallet: string;
+  requesterAddress?: string;
+  requesterNote?: string;
+  requestedAt: string;
+  status: "pending" | "approved" | "denied";
+  resolvedAt?: string;
+  accessToken?: string;
+}
+
 interface PayloadDatabaseData {
   users: Record<string, PayloadUser>;
   files: Record<string, PayloadFile>;
@@ -22,6 +36,7 @@ interface PayloadDatabaseData {
   manifests: Record<string, PayloadManifest>;
   shares: Record<string, PayloadShare>;
   activity: PayloadActivityLog[];
+  accessRequests: Record<string, AccessRequest>;
 }
 
 // In-memory cache for fast operations
@@ -32,6 +47,7 @@ let memoryDb: PayloadDatabaseData = {
   manifests: {},
   shares: {},
   activity: [],
+  accessRequests: {},
 };
 
 let isLoaded = false;
@@ -69,6 +85,7 @@ function loadStore(): void {
           manifests: parsed.manifests || {},
           shares: parsed.shares || {},
           activity: parsed.activity || [],
+          accessRequests: parsed.accessRequests || {},
         };
       }
       lastMtimeMs = stat.mtimeMs;
@@ -339,6 +356,7 @@ export const payloadStore = {
     oneTime?: boolean;
     burnAfterReading?: boolean;
     burnDurationSeconds?: number;
+    requireApproval?: boolean;
     passwordProtected?: boolean;
     passwordHash?: string;
     manifest?: PayloadManifest | null;
@@ -422,6 +440,7 @@ export const payloadStore = {
       oneTime: Boolean(data.oneTime),
       burnAfterReading: Boolean(data.burnAfterReading),
       burnDurationSeconds: data.burnDurationSeconds !== undefined ? Number(data.burnDurationSeconds) : 60,
+      requireApproval: Boolean(data.requireApproval),
       passwordProtected: Boolean(data.passwordProtected),
       passwordHash: data.passwordHash,
       manifest: data.manifest || null,
@@ -761,5 +780,82 @@ export const payloadStore = {
 
   getUser(walletAddress: string): PayloadUser | null {
     return this.getUserByWallet(walletAddress);
+  },
+
+  // ── ACCESS REQUESTS ───────────────────────────────────────────────────
+  createAccessRequest(data: {
+    shareCode: string;
+    fileId: string;
+    fileName: string;
+    ownerWallet: string;
+    requesterAddress?: string;
+    requesterNote?: string;
+  }): AccessRequest {
+    loadStore();
+    const id = `req_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    const req: AccessRequest = {
+      id,
+      shareCode: data.shareCode,
+      fileId: data.fileId,
+      fileName: data.fileName,
+      ownerWallet: data.ownerWallet.toLowerCase(),
+      requesterAddress: data.requesterAddress?.toLowerCase(),
+      requesterNote: data.requesterNote,
+      requestedAt: new Date().toISOString(),
+      status: "pending",
+    };
+    memoryDb.accessRequests[id] = req;
+    saveStore();
+    return req;
+  },
+
+  getAccessRequest(requestId: string): AccessRequest | null {
+    loadStore();
+    return memoryDb.accessRequests[requestId] || null;
+  },
+
+  getAccessRequestByToken(token: string): AccessRequest | null {
+    loadStore();
+    return Object.values(memoryDb.accessRequests).find(
+      (r) => r.accessToken === token && r.status === "approved"
+    ) || null;
+  },
+
+  getPendingRequestsForOwner(ownerWallet: string): AccessRequest[] {
+    loadStore();
+    const normalized = ownerWallet.toLowerCase();
+    return Object.values(memoryDb.accessRequests)
+      .filter((r) => r.ownerWallet === normalized)
+      .sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime());
+  },
+
+  approveAccessRequest(requestId: string, ownerWallet: string): AccessRequest | null {
+    loadStore();
+    const req = memoryDb.accessRequests[requestId];
+    if (!req) return null;
+    if (req.ownerWallet !== ownerWallet.toLowerCase()) return null;
+    req.status = "approved";
+    req.resolvedAt = new Date().toISOString();
+    req.accessToken = `tok_${Date.now()}_${Math.random().toString(36).substring(2, 12)}`;
+    saveStore();
+    return req;
+  },
+
+  denyAccessRequest(requestId: string, ownerWallet: string): AccessRequest | null {
+    loadStore();
+    const req = memoryDb.accessRequests[requestId];
+    if (!req) return null;
+    if (req.ownerWallet !== ownerWallet.toLowerCase()) return null;
+    req.status = "denied";
+    req.resolvedAt = new Date().toISOString();
+    saveStore();
+    return req;
+  },
+
+  pollAccessRequest(requestId: string): { status: AccessRequest["status"]; accessToken?: string } | null {
+    loadStore();
+    const req = memoryDb.accessRequests[requestId];
+    if (!req) return null;
+    return { status: req.status, accessToken: req.accessToken };
   },
 };

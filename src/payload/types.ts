@@ -128,6 +128,7 @@ export interface PayloadShare {
   passwordHash?: string; // SHA-256 hash
   burnAfterReading?: boolean; // Self-destruct enabled
   burnDurationSeconds?: number; // Countdown seconds after first decryption (e.g. 60, 300)
+  requireApproval?: boolean; // Owner must manually approve each access request
   status: ShareStatus;
   manifest?: PayloadManifest | null;
   chunks?: PayloadChunk[];

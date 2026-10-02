@@ -19,6 +19,7 @@ import {
   QrCode,
   Zap,
   Flame,
+  UserCheck,
 } from "lucide-react";
 import { formatBytes } from "@/lib/crypto";
 import { OwlCompanion, OwlState } from "@/components/ui/OwlCompanion";
@@ -72,6 +73,7 @@ export function CreateSecureShareModal({
   const [oneTime, setOneTime] = useState(false);
   const [burnAfterReading, setBurnAfterReading] = useState(false);
   const [burnDurationSeconds, setBurnDurationSeconds] = useState<number>(60);
+  const [requireApproval, setRequireApproval] = useState(true);
 
   // Creation State
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -226,6 +228,7 @@ export function CreateSecureShareModal({
           oneTime,
           burnAfterReading,
           burnDurationSeconds,
+          requireApproval,
         },
         effectiveOwner
       );
@@ -577,6 +580,25 @@ export function CreateSecureShareModal({
                         </div>
                       )}
                     </div>
+
+                    {/* Owner Approval Gate */}
+                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                      <div>
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
+                          <UserCheck className={`h-3.5 w-3.5 ${requireApproval ? "text-[#2563EB]" : "text-slate-400"}`} />
+                          <span>Require Owner Approval</span>
+                        </div>
+                        <span className="text-[10px] text-slate-500 block">
+                          You must approve each recipient before they can decrypt or download this file
+                        </span>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={requireApproval}
+                        onChange={(e) => setRequireApproval(e.target.checked)}
+                        className="h-4 w-4 rounded text-[#2563EB] focus:ring-[#2563EB] accent-[#2563EB] cursor-pointer"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -673,6 +695,12 @@ export function CreateSecureShareModal({
                       <div className="flex items-center gap-1.5 text-amber-700 font-medium">
                         <Flame className="h-3.5 w-3.5 text-amber-600 animate-pulse" />
                         <span>Self-destruct armed ({createdShare.burnDurationSeconds || 60}s countdown on read)</span>
+                      </div>
+                    )}
+                    {createdShare.requireApproval && (
+                      <div className="flex items-center gap-1.5 text-blue-700 font-medium">
+                        <UserCheck className="h-3.5 w-3.5 text-blue-600" />
+                        <span>Owner approval gate active — you must approve access requests</span>
                       </div>
                     )}
                   </div>
