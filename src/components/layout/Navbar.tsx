@@ -1,13 +1,15 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Shield, KeyRound, Menu, X, Check, Copy } from "lucide-react";
+import { Shield, KeyRound, Menu, X, Check, Copy, Bell } from "lucide-react";
 import { WalletConnectButton } from "@/components/wallet/WalletConnectButton";
 import { useAuthStatus } from "@/hooks/useAuthStatus";
 import { useVaultXWallet } from "@/context/VaultXWalletContext";
 import { formatAddress, cn } from "@/lib/utils";
+import { PendingApprovalsModal } from "@/components/dashboard/PendingApprovalsModal";
+import { fetchPendingApprovalsApi } from "@/lib/payloadClient";
 
 export function Navbar() {
   const pathname = usePathname();
@@ -15,8 +17,28 @@ export function Navbar() {
   const { isConnected: isVxConnected, identity } = useVaultXWallet();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [isApprovalsOpen, setIsApprovalsOpen] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
 
   const activeAddress = (isVxConnected && identity?.id) ? identity.id : address;
+
+  useEffect(() => {
+    if (!activeAddress) return;
+    const pollApprovals = async () => {
+      try {
+        const res = await fetchPendingApprovalsApi(activeAddress);
+        if (res.success && Array.isArray(res.requests)) {
+          const pending = res.requests.filter((r: any) => r.status === "pending").length;
+          setPendingCount(pending);
+        }
+      } catch {
+        // silent
+      }
+    };
+    pollApprovals();
+    const interval = setInterval(pollApprovals, 5000);
+    return () => clearInterval(interval);
+  }, [activeAddress]);
 
   const handleCopy = () => {
     if (!activeAddress) return;
@@ -109,16 +131,60 @@ export function Navbar() {
                 </button>
               )}
 
+              {/* Approvals Bell / Pill */}
+              <button
+                type="button"
+                onClick={() => setIsApprovalsOpen(true)}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold transition-all shadow-xs cursor-pointer ${
+                  pendingCount > 0
+                    ? "bg-amber-500 hover:bg-amber-600 text-white animate-pulse shadow-amber-500/30"
+                    : "border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700"
+                }`}
+                title="Access Approvals"
+              >
+                <Bell className={`h-3.5 w-3.5 ${pendingCount > 0 ? "text-white" : "text-[#2563EB]"}`} />
+                <span>Approvals</span>
+                {pendingCount > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-white text-amber-600">
+                    {pendingCount}
+                  </span>
+                )}
+              </button>
+
               <WalletConnectButton size="sm" showNetworkBadge={false} />
             </div>
           ) : (
             /* Not Connected: Solid Blue "Connect Wallet" Pill Button */
-            <WalletConnectButton size="default" />
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsApprovalsOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 hover:bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 transition-colors cursor-pointer"
+                title="Access Approvals"
+              >
+                <Bell className="h-3.5 w-3.5 text-[#2563EB]" />
+                <span>Approvals</span>
+              </button>
+              <WalletConnectButton size="default" />
+            </div>
           )}
         </div>
 
         {/* Mobile Hamburger Button */}
         <div className="flex sm:hidden items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsApprovalsOpen(true)}
+            className="p-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-700 relative"
+            title="Approvals"
+          >
+            <Bell className="h-4 w-4 text-[#2563EB]" />
+            {pendingCount > 0 && (
+              <span className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-amber-500 text-white text-[9px] font-black flex items-center justify-center">
+                {pendingCount}
+              </span>
+            )}
+          </button>
           <WalletConnectButton size="sm" showNetworkBadge={false} />
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -145,9 +211,36 @@ export function Navbar() {
                 <span>{link.label}</span>
               </Link>
             ))}
+
+            <button
+              type="button"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                setIsApprovalsOpen(true);
+              }}
+              className="flex items-center justify-between rounded-xl px-3.5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
+            >
+              <span className="flex items-center gap-2">
+                <Bell className="h-4 w-4 text-[#2563EB]" />
+                <span>Access Approvals</span>
+              </span>
+              {pendingCount > 0 && (
+                <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-500 text-white">
+                  {pendingCount} pending
+                </span>
+              )}
+            </button>
           </nav>
         </div>
       )}
+
+      {/* Global Pending Approvals Modal */}
+      <PendingApprovalsModal
+        isOpen={isApprovalsOpen}
+        onClose={() => setIsApprovalsOpen(false)}
+        vaultXId={activeAddress}
+        onRequestCountChange={setPendingCount}
+      />
     </header>
   );
 }

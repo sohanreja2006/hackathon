@@ -40,6 +40,19 @@ export async function getPayloadAuth(
     return { walletAddress: cleanAddr };
   }
 
+  // 4. Fourth priority: URL query param (useful for SSE or GET polling)
+  try {
+    const { searchParams } = new URL(req.url);
+    const qWallet = searchParams.get("wallet") || searchParams.get("owner");
+    if (qWallet && qWallet.trim()) {
+      const cleanQ = qWallet.trim().toLowerCase();
+      payloadStore.findOrCreateUser(cleanQ);
+      return { walletAddress: cleanQ };
+    }
+  } catch {
+    // ignore
+  }
+
   return null;
 }
 

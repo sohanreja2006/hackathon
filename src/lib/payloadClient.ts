@@ -438,7 +438,10 @@ export async function fetchPendingApprovalsApi(
   vaultXId?: string | null
 ): Promise<{ success: boolean; requests: any[]; error?: string }> {
   try {
-    const res = await fetch("/api/payload/shares/pending-approvals", {
+    const url = vaultXId
+      ? `/api/payload/shares/pending-approvals?wallet=${encodeURIComponent(vaultXId)}`
+      : "/api/payload/shares/pending-approvals";
+    const res = await fetch(url, {
       method: "GET",
       headers: getAuthHeaders(vaultXId),
     });

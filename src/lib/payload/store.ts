@@ -55,12 +55,27 @@ let lastMtimeMs = 0;
 
 // Resolve persistence file path safely
 function getStoreFilePath(): string {
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NODE_ENV === "production") {
+    const tmpPath = path.join("/tmp", "payload-store.json");
+    if (!fs.existsSync(tmpPath)) {
+      try {
+        const seedPath = path.join(process.cwd(), ".payload-store.json");
+        if (fs.existsSync(seedPath)) {
+          const content = fs.readFileSync(seedPath, "utf-8");
+          fs.writeFileSync(tmpPath, content, "utf-8");
+        }
+      } catch {
+        // ignore seed error
+      }
+    }
+    return tmpPath;
+  }
+
   try {
     const primaryPath = path.join(process.cwd(), ".payload-store.json");
-    if (fs.existsSync(primaryPath)) {
-      return primaryPath;
+    if (!fs.existsSync(primaryPath)) {
+      fs.writeFileSync(primaryPath, JSON.stringify(memoryDb), { flag: "w" });
     }
-    fs.writeFileSync(primaryPath, JSON.stringify(memoryDb), { flag: "a" });
     return primaryPath;
   } catch {
     return path.join("/tmp", "payload-store.json");
@@ -70,28 +85,35 @@ function getStoreFilePath(): string {
 function loadStore(): void {
   try {
     const filePath = getStoreFilePath();
+    let raw = "";
     if (fs.existsSync(filePath)) {
       const stat = fs.statSync(filePath);
       if (isLoaded && stat.mtimeMs <= lastMtimeMs) {
         return;
       }
-      const raw = fs.readFileSync(filePath, "utf-8");
-      if (raw.trim()) {
-        const parsed = JSON.parse(raw);
-        memoryDb = {
-          users: parsed.users || {},
-          files: parsed.files || {},
-          chunks: parsed.chunks || {},
-          manifests: parsed.manifests || {},
-          shares: parsed.shares || {},
-          activity: parsed.activity || [],
-          accessRequests: parsed.accessRequests || {},
-        };
-      }
+      raw = fs.readFileSync(filePath, "utf-8");
       lastMtimeMs = stat.mtimeMs;
+    } else {
+      const tmpPath = path.join("/tmp", "payload-store.json");
+      if (fs.existsSync(tmpPath)) {
+        raw = fs.readFileSync(tmpPath, "utf-8");
+      }
+    }
+
+    if (raw && raw.trim()) {
+      const parsed = JSON.parse(raw);
+      memoryDb = {
+        users: parsed.users || {},
+        files: parsed.files || {},
+        chunks: parsed.chunks || {},
+        manifests: parsed.manifests || {},
+        shares: parsed.shares || {},
+        activity: parsed.activity || [],
+        accessRequests: parsed.accessRequests || {},
+      };
     }
   } catch (err) {
-    console.warn("Payload store: error loading local storage, using memory:", err);
+    console.warn("Payload store: error loading storage, using memory:", err);
   }
   isLoaded = true;
 }
@@ -105,8 +127,14 @@ function saveStore(): void {
     } catch {
       lastMtimeMs = Date.now();
     }
-  } catch (err) {
-    console.warn("Payload store: unable to persist to disk (serverless environment):", err);
+  } catch {
+    try {
+      const fallback = path.join("/tmp", "payload-store.json");
+      fs.writeFileSync(fallback, JSON.stringify(memoryDb, null, 2), "utf-8");
+      lastMtimeMs = Date.now();
+    } catch (fallbackErr) {
+      console.warn("Payload store: unable to persist to disk:", fallbackErr);
+    }
   }
 }
 
