@@ -597,6 +597,8 @@ export function ReceiveSecureFileModal({
     setOwlState("idle");
   };
 
+  if (!isOpen) return null;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="relative w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl border border-slate-200/90 max-h-[92vh] flex flex-col">

@@ -18,7 +18,13 @@ export default function ShareRecipientPage({ params }: SharePageProps) {
       {shareId ? (
         <ReceiveSecureFileModal
           isOpen={true}
-          onClose={() => router.push("/dashboard")}
+          onClose={() => {
+            if (window.history.length > 1) {
+              router.back();
+            } else {
+              router.push("/dashboard");
+            }
+          }}
           initialCode={shareId}
         />
       ) : (

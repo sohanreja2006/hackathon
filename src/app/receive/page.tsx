@@ -13,7 +13,13 @@ function ReceiveContent() {
     <div className="min-h-[80vh] flex items-center justify-center p-4">
       <ReceiveSecureFileModal
         isOpen={true}
-        onClose={() => router.push("/dashboard")}
+        onClose={() => {
+          if (window.history.length > 1) {
+            router.back();
+          } else {
+            router.push("/dashboard");
+          }
+        }}
         initialCode={code}
       />
     </div>
